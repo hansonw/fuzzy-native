@@ -1,0 +1,138 @@
+#include <nan.h>
+#include <iostream>
+#include <vector>
+#include <unordered_map>
+#include <chrono>
+
+#include "MatcherBase.h"
+
+using namespace Nan;
+
+#define CHECK(cond, msg)                                                       \
+  if (!(cond)) {                                                               \
+    ThrowTypeError(msg);                                                       \
+    return;                                                                    \
+  }
+
+template <typename T>
+T get_property(const v8::Local<v8::Object> &object, const char *name) {
+  auto prop = Nan::Get(object, Nan::New(name).ToLocalChecked());
+  if (prop.IsEmpty()) {
+    return T();
+  }
+  Nan::Maybe<T> result = Nan::To<T>(prop.ToLocalChecked());
+  if (result.IsNothing()) {
+    return T();
+  }
+  return result.FromJust();
+}
+
+/**
+ * This saves one string copy over using v8::String::Utf8Value.
+ */
+std::string to_std_string(const v8::Local<v8::String> &v8str) {
+  std::string str(v8str->Utf8Length(), ' ');
+  v8str->WriteUtf8(&str[0]);
+  return str;
+}
+
+Persistent<v8::Function> MatcherConstructor;
+
+class Matcher : public ObjectWrap {
+public:
+  static void Init(v8::Local<v8::Object> exports) {
+    // Prepare constructor template
+    v8::Local<v8::FunctionTemplate> tpl =
+        New<v8::FunctionTemplate>(Matcher::Create);
+    tpl->SetClassName(New("Matcher").ToLocalChecked());
+    tpl->InstanceTemplate()->SetInternalFieldCount(1);
+
+    // Prototype
+    SetPrototypeMethod(tpl, "match", Match);
+    SetPrototypeMethod(tpl, "addCandidates", AddCandidates);
+    SetPrototypeMethod(tpl, "removeCandidates", RemoveCandidates);
+    SetPrototypeMethod(tpl, "setCandidates", SetCandidates);
+
+    MatcherConstructor.Reset(tpl->GetFunction());
+    exports->Set(Nan::New("Matcher").ToLocalChecked(), tpl->GetFunction());
+  }
+
+  static void Create(const Nan::FunctionCallbackInfo<v8::Value> &info) {
+    CHECK(info.IsConstructCall(), "Use 'new' to construct Matcher");
+    auto obj = new Matcher();
+    obj->Wrap(info.This());
+    AddCandidates(info);
+    info.GetReturnValue().Set(info.This());
+  }
+
+  static void Match(const FunctionCallbackInfo<v8::Value> &info) {
+    if (info.Length() < 1) {
+      Nan::ThrowTypeError("Wrong number of arguments");
+      return;
+    }
+
+    CHECK(info[0]->IsString(), "First argument should be a query string");
+    std::string query(to_std_string(info[0]->ToString()));
+
+    MatcherOptions options;
+    if (info.Length() > 1) {
+      CHECK(info[1]->IsObject(), "Second argument should be an options object");
+      auto options_obj = info[1]->ToObject();
+      options.case_sensitive = get_property<bool>(options_obj, "caseSensitive");
+      options.num_threads = get_property<int>(options_obj, "numThreads");
+      options.max_results = get_property<int>(options_obj, "maxResults");
+    }
+
+    auto valueKey = New("value").ToLocalChecked();
+    auto scoreKey = New("score").ToLocalChecked();
+
+    auto matcher = Unwrap<Matcher>(info.This());
+    std::vector<MatchResult> matches =
+        matcher->impl_.findMatches(query, options);
+    auto result = New<v8::Array>();
+    size_t result_count = 0;
+    for (const auto &match : matches) {
+      auto obj = New<v8::Object>();
+      Set(obj, scoreKey, New(match.score));
+      Set(obj, valueKey, New(match.value).ToLocalChecked());
+      result->Set(result_count++, obj);
+    }
+    info.GetReturnValue().Set(result);
+  }
+
+  static void AddCandidates(const FunctionCallbackInfo<v8::Value> &info) {
+    auto matcher = Unwrap<Matcher>(info.This());
+    if (info.Length() > 0) {
+      CHECK(info[0]->IsArray(), "Expected an array of strings");
+      auto arg1 = v8::Local<v8::Array>::Cast(info[0]);
+      matcher->impl_.reserve(matcher->impl_.size() + arg1->Length());
+      for (size_t i = 0; i < arg1->Length(); i++) {
+        matcher->impl_.addCandidate(to_std_string(arg1->Get(i)->ToString()));
+      }
+    }
+  }
+
+  static void RemoveCandidates(const FunctionCallbackInfo<v8::Value> &info) {
+    auto matcher = Unwrap<Matcher>(info.This());
+    if (info.Length() > 0) {
+      CHECK(info[0]->IsArray(), "Expected an array of strings");
+      auto arg1 = v8::Local<v8::Array>::Cast(info[0]);
+      for (size_t i = 0; i < arg1->Length(); i++) {
+        matcher->impl_.removeCandidate(to_std_string(arg1->Get(i)->ToString()));
+      }
+    }
+  }
+
+  static void SetCandidates(const FunctionCallbackInfo<v8::Value> &info) {
+    auto matcher = Unwrap<Matcher>(info.This());
+    matcher->impl_.clear();
+    AddCandidates(info);
+  }
+
+private:
+  MatcherBase impl_;
+};
+
+void Init(v8::Local<v8::Object> exports) { Matcher::Init(exports); }
+
+NODE_MODULE(addon, Init)

@@ -1,0 +1,89 @@
+sudo: false
+
+addons:
+  apt:
+    sources:
+      - ubuntu-toolchain-r-test
+    packages:
+      - g++-4.8
+
+matrix:
+  include:
+    # linux
+    - os: linux
+      env: NODE_VERSION="0.12"  # abi 14
+    - os: linux
+      env: NODE_VERSION="2"     # abi 44
+    - os: linux
+      env: NODE_VERSION="3"     # abi 45
+    - os: linux
+      env: NODE_VERSION="4"     # abi 46
+    - os: linux
+      env: NODE_VERSION="5"     # abi 47
+    # os x x86
+    - os: osx
+      env: NODE_VERSION="0.12"
+    - os: osx
+      env: NODE_VERSION="2"
+    - os: osx
+      env: NODE_VERSION="3"
+    - os: osx
+      env: NODE_VERSION="4"
+    - os: osx
+      env: NODE_VERSION="5"
+    # osx ia32
+    - os: osx
+      env: NODE_VERSION="0.12" TARGET_ARCH="ia32"
+    - os: osx
+      env: NODE_VERSION="2" TARGET_ARCH="ia32"
+    - os: osx
+      env: NODE_VERSION="3" TARGET_ARCH="ia32"
+    - os: osx
+      env: NODE_VERSION="4" TARGET_ARCH="ia32"
+    - os: osx
+      env: NODE_VERSION="5" TARGET_ARCH="ia32"
+
+before_install:
+  - rm -rf ~/.nvm/ && git clone --depth 1 "https://github.com/creationix/nvm.git" ~/.nvm
+  - source ~/.nvm/nvm.sh
+  - nvm install $NODE_VERSION
+  - nvm use $NODE_VERSION
+  - if [[ $NODE_VERSION == "0.10" ]]; then
+      npm -g install npm@latest-2;
+    fi
+  - export PATH="./node_modules/.bin/:$PATH"
+
+install:
+  - export CXX=g++-4.8
+  - $CXX --version
+  - npm install
+
+script:
+  - if [[ -z "$TARGET_ARCH" ]]; then
+      node-pre-gyp rebuild package testpackage --build-from-source;
+      npm test;
+    else
+      node-pre-gyp rebuild package testpackage --build-from-source --target_arch=$TARGET_ARCH;
+    fi
+
+git:
+  depth: 10
+
+branches:
+  only:
+    - master
+    - /^v\d+\.\d+\.\d+(?:-[a-z0-9.-]+)?$/
+
+before_deploy:
+  - export RELEASE_NODE_FILE=$(find build/stage -name '*.tar.gz')
+  - echo "Deploying $RELEASE_NODE_FILE to GitHub"
+
+deploy:
+  provider: releases
+  api_key:
+    secure: O3QcxmbHw+ONU2KtfyLPulYY6Reas74xmSKBdxnbhyKnRGmuJo6X2+QE3F6TycA0IgY5PpV7PqM8V7rQ8+RgxJXRShq3EslZmf/ujUBn9nxX1mR61qjhclbQN6OLeWhUKEHp6Dz5xbqjO3NNDk4CdMPsa3DeBYjo8mDPFn96AQp4IoyM7GAUSC56t82xlyLqQ99pA235JH0YjL4V0s8YHLxMJDIzsDYWNz/BKk1Yck+MIeBlQtbwd4ZBSnnOJjkhkCzvdCtHN/rYRfM9I6T7BpFg0CgpccvGSZZ8zhuyAnvy9fI9MUiaA8e6gQYwbSEFFqokCohd7dsxbqURcbk80C/6w3DzmK51B5MQe8ozbFNHX0lNoKhzl9pQY76Gfa4atMD4dbQBsFu7aioYu/mR45cu4DPvDzE4E41lo/2f1B8dFgTvWoNqTdeZBZ1ths0rODHG7FO7nfzSwUPMYxJpNafcvs55FE7RiEKpeAEEAUubJSAfWvRGPxoAqBRxIjBzKwIt9L6zvnYHU/8P7Jp1zVHmRlguEa/CjkO1NmoCIbAHpDaRJv9rszV8o7I3CUYz67y8t7lgW0vlgH8iletN7LjE2bCEimdCgXRaeN4EyykxoGJf2BaHNuj1cIuHjpsqx9gDhuTL+fd45vm7DNSrFJPn106Uh6W42GxJ+/rTUbc=
+  file: "$RELEASE_NODE_FILE"
+  skip_cleanup: true
+  on:
+    repo: hansonw/fuzzy-native
+    tags: true

@@ -6,8 +6,13 @@
   "scripts": {
     "test": "jasmine-node --captureExceptions spec",
     "rebuild": "node-pre-gyp rebuild",
-    "install": "node-pre-gyp install --fallback-to-build"
+    "install": "node-pre-gyp install --fallback-to-build",
+    "prepublish": "node tools/prepublish.js"
   },
+  "files": [
+    "build/fuzzy-native",
+    "lib"
+  ],
   "keywords": [
     "fuzzy",
     "native",
@@ -19,7 +24,8 @@
   "devDependencies": {
     "jasmine-node": "^1.14.5",
     "nan": "^2.2.0",
-    "node-pre-gyp": "^0.6.21"
+    "node-pre-gyp": "^0.6.21",
+    "rimraf": "^2.5.2"
   },
   "dependencies": {
     "semver": "^5.1.0"

@@ -1,5 +1,7 @@
 # fuzzy-native
 
+[![Build Status](https://travis-ci.org/hansonw/fuzzy-native.svg?branch=master)](https://travis-ci.org/hansonw/fuzzy-native)
+
 Fuzzy string matching library package for Node. Implemented natively in C++ for speed with support for multithreading.
 
 The scoring algorithm is heavily tuned for file paths, but should work for general strings.

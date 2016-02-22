@@ -1,6 +1,6 @@
 {
   "name": "fuzzy-native",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Native C++ implementation of a fuzzy string matcher.",
   "main": "lib/main.js",
   "scripts": {
@@ -10,6 +10,7 @@
     "prepublish": "node tools/prepublish.js"
   },
   "files": [
+    "binding.gyp",
     "build/fuzzy-native",
     "lib"
   ],
@@ -20,15 +21,21 @@
     "string"
   ],
   "author": "Hanson Wang (hanson.wng@gmail.com)",
+  "repository": "https://github.com/hansonw/fuzzy-native",
   "license": "MIT",
+  "dependencies": {
+    "nan": "^2.0.0",
+    "node-pre-gyp": "^0.6.5",
+    "semver": "^5.0.0"
+  },
+  "bundledDependencies": [
+    "node-pre-gyp"
+  ],
   "devDependencies": {
     "jasmine-node": "^1.14.5",
     "nan": "^2.2.0",
     "node-pre-gyp": "^0.6.21",
     "rimraf": "^2.5.2"
-  },
-  "dependencies": {
-    "semver": "^5.1.0"
   },
   "binary": {
     "module_name": "fuzzy-native",

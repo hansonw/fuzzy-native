@@ -33,8 +33,6 @@
   ],
   "devDependencies": {
     "jasmine-node": "^1.14.5",
-    "nan": "^2.2.0",
-    "node-pre-gyp": "^0.6.21",
     "rimraf": "^2.5.2"
   },
   "binary": {

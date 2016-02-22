@@ -22,7 +22,7 @@ coverage
 
 # Compiled binary addons (http://nodejs.org/api/addons.html)
 /build
-compile-commands.json
+compile_commands.json
 
 # Dependency directory
 node_modules

@@ -11,37 +11,37 @@ matrix:
   include:
     # linux
     - os: linux
-      env: NODE_VERSION="0.12"  # abi 14
+      env: NODE_VERSION="0.12" CXX="g++-4.8" # abi 14
     - os: linux
-      env: NODE_VERSION="2"     # abi 44
+      env: NODE_VERSION="2" CXX="g++-4.8"    # abi 44
     - os: linux
-      env: NODE_VERSION="3"     # abi 45
+      env: NODE_VERSION="3" CXX="g++-4.8"    # abi 45
     - os: linux
-      env: NODE_VERSION="4"     # abi 46
+      env: NODE_VERSION="4" CXX="g++-4.8"    # abi 46
     - os: linux
-      env: NODE_VERSION="5"     # abi 47
+      env: NODE_VERSION="5" CXX="g++-4.8"    # abi 47
     # os x x86
     - os: osx
-      env: NODE_VERSION="0.12"
+      env: NODE_VERSION="0.12" CXX="clang"
     - os: osx
-      env: NODE_VERSION="2"
+      env: NODE_VERSION="2" CXX="clang"
     - os: osx
-      env: NODE_VERSION="3"
+      env: NODE_VERSION="3" CXX="clang"
     - os: osx
-      env: NODE_VERSION="4"
+      env: NODE_VERSION="4" CXX="clang"
     - os: osx
-      env: NODE_VERSION="5"
+      env: NODE_VERSION="5" CXX="clang"
     # osx ia32
     - os: osx
-      env: NODE_VERSION="0.12" TARGET_ARCH="ia32"
+      env: NODE_VERSION="0.12" TARGET_ARCH="ia32" CXX="clang"
     - os: osx
-      env: NODE_VERSION="2" TARGET_ARCH="ia32"
+      env: NODE_VERSION="2" TARGET_ARCH="ia32" CXX="clang"
     - os: osx
-      env: NODE_VERSION="3" TARGET_ARCH="ia32"
+      env: NODE_VERSION="3" TARGET_ARCH="ia32" CXX="clang"
     - os: osx
-      env: NODE_VERSION="4" TARGET_ARCH="ia32"
+      env: NODE_VERSION="4" TARGET_ARCH="ia32" CXX="clang"
     - os: osx
-      env: NODE_VERSION="5" TARGET_ARCH="ia32"
+      env: NODE_VERSION="5" TARGET_ARCH="ia32" CXX="clang"
 
 before_install:
   - rm -rf ~/.nvm/ && git clone --depth 1 "https://github.com/creationix/nvm.git" ~/.nvm
@@ -54,8 +54,6 @@ before_install:
   - export PATH="./node_modules/.bin/:$PATH"
 
 install:
-  - export CXX=g++-4.8
-  - $CXX --version
   - npm install
 
 script:

@@ -5,9 +5,9 @@
 #include <vector>
 
 struct MatcherOptions {
-  bool case_sensitive;
-  size_t num_threads;
-  size_t max_results;
+  bool case_sensitive = false;
+  size_t num_threads = 0;
+  size_t max_results = 0;
 };
 
 struct MatchResult {

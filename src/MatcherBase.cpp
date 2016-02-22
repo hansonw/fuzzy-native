@@ -2,6 +2,7 @@
 #include "score_match.h"
 
 #include <iostream>
+#include <algorithm>
 #include <queue>
 #include <thread>
 

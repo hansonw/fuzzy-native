@@ -81,10 +81,13 @@ public:
       options.case_sensitive = get_property<bool>(options_obj, "caseSensitive");
       options.num_threads = get_property<int>(options_obj, "numThreads");
       options.max_results = get_property<int>(options_obj, "maxResults");
+      options.record_match_indexes =
+          get_property<bool>(options_obj, "recordMatchIndexes");
     }
 
     auto valueKey = New("value").ToLocalChecked();
     auto scoreKey = New("score").ToLocalChecked();
+    auto matchIndexesKey = New("matchIndexes").ToLocalChecked();
 
     auto matcher = Unwrap<Matcher>(info.This());
     std::vector<MatchResult> matches =
@@ -95,6 +98,13 @@ public:
       auto obj = New<v8::Object>();
       Set(obj, scoreKey, New(match.score));
       Set(obj, valueKey, New(match.value).ToLocalChecked());
+      if (match.matchIndexes != nullptr) {
+        auto array = New<v8::Array>(match.matchIndexes->size());
+        for (size_t i = 0; i < array->Length(); i++) {
+          array->Set(i, New(match.matchIndexes->at(i)));
+        }
+        Set(obj, matchIndexesKey, array);
+      }
       result->Set(result_count++, obj);
     }
     info.GetReturnValue().Set(result);

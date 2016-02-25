@@ -28,6 +28,7 @@ struct MatchInfo {
   int* last_match;
   double max_score_per_char;
   double *memo;
+  size_t *best_match;
 };
 
 /**
@@ -52,18 +53,20 @@ struct MatchInfo {
  * We use a memoized-recursive implementation, since the state space tends to
  * be relatively sparse in most practical use cases.
  */
-double recursive_match(const MatchInfo &m, size_t haystack_idx,
-                       size_t needle_idx) {
+double recursive_match(const MatchInfo &m,
+                       const size_t haystack_idx,
+                       const size_t needle_idx) {
   if (needle_idx == m.needle_len) {
     return 0;
   }
 
-  double &memoized = m.memo[needle_idx * m.needle_len + haystack_idx];
+  double &memoized = m.memo[needle_idx * m.haystack_len + haystack_idx];
   if (memoized != -1) {
     return memoized;
   }
 
   double score = -1e9;
+  size_t best_match = 0;
   char c = m.needle[needle_idx];
 
   size_t lim = m.last_match[needle_idx];
@@ -72,8 +75,7 @@ double recursive_match(const MatchInfo &m, size_t haystack_idx,
   }
 
   for (size_t j = haystack_idx; j <= lim; j++) {
-    char d = m.haystack_case[j];
-    if (c == d) {
+    if (c == m.haystack_case[j]) {
       // calculate score
       double score_for_char = m.max_score_per_char;
       double factor = 1.0;
@@ -102,15 +104,20 @@ double recursive_match(const MatchInfo &m, size_t haystack_idx,
           score_for_char * factor + recursive_match(m, j + 1, needle_idx + 1);
       if (new_score > score) {
         score = new_score;
+        best_match = j;
       }
     }
   }
 
+  if (m.best_match != nullptr) {
+    m.best_match[needle_idx * m.haystack_len + haystack_idx] = best_match;
+  }
   return memoized = score;
 }
 
 double score_match(const char *haystack, const char *haystack_lower,
-                   const char *needle, const MatchOptions &options) {
+                   const char *needle, const MatchOptions &options,
+                   vector<int> *match_indexes) {
   if (!*needle) {
     // Not much we can do here - we'll end up with a random selection.
     return 1;
@@ -148,8 +155,26 @@ double score_match(const char *haystack, const char *haystack_lower,
     return m.max_score_per_char * m.needle_len * 0.75 / 2;
   }
 
+  if (match_indexes != nullptr) {
+    m.best_match = new size_t[memo_size];
+  } else {
+    m.best_match = nullptr;
+  }
+
   double memo[memo_size];
   fill(memo, memo + memo_size, -1);
   m.memo = memo;
-  return recursive_match(m, 0, 0);
+  double score = recursive_match(m, 0, 0);
+
+  if (match_indexes != nullptr) {
+    match_indexes->resize(m.needle_len);
+    size_t curr_start = 0;
+    for (size_t i = 0; i < m.needle_len; i++) {
+      match_indexes->at(i) = m.best_match[i * m.haystack_len + curr_start];
+      curr_start = match_indexes->at(i) + 1;
+    }
+    delete[] m.best_match;
+  }
+
+  return score;
 }

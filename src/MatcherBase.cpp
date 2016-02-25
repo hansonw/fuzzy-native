@@ -20,7 +20,7 @@ inline int letter_bitmask(const char *str) {
   return result;
 }
 
-inline string str_to_lower(const string& s) {
+inline string str_to_lower(const char *s) {
   string lower(s);
   for (auto& c : lower) {
     if (c >= 'A' && c <= 'Z') {
@@ -36,20 +36,32 @@ void push_heap(ResultHeap &heap,
                const char *value,
                size_t max_results) {
   if (heap.size() < max_results || score > heap.top().score) {
-    heap.emplace(MatchResult {
-      .score = score,
-      .value = value,
-    });
+    heap.emplace(score, value);
     if (heap.size() > max_results) {
       heap.pop();
     }
   }
 }
 
-vector<MatchResult> heap_to_vector(ResultHeap &&heap) {
+vector<MatchResult> finalize(const string &query,
+                             const MatchOptions &options,
+                             bool record_match_indexes,
+                             ResultHeap &&heap) {
   vector<MatchResult> vec;
   while (heap.size()) {
-    vec.emplace_back(move(heap.top()));
+    const MatchResult &result = heap.top();
+    if (record_match_indexes) {
+      result.matchIndexes.reset(new vector<int>(query.size()));
+      string lower = str_to_lower(result.value);
+      score_match(
+        result.value,
+        lower.c_str(),
+        query.c_str(),
+        options,
+        result.matchIndexes.get()
+      );
+    }
+    vec.push_back(result);
     heap.pop();
   }
   reverse(vec.begin(), vec.end());
@@ -104,14 +116,15 @@ vector<MatchResult> MatcherBase::findMatches(const std::string &query,
     }
   }
   if (!options.case_sensitive) {
-    new_query = str_to_lower(new_query);
+    new_query = str_to_lower(new_query.c_str());
   }
 
   if (num_threads == 0 || candidates_.size() < 10000) {
     ResultHeap result;
     thread_worker(new_query, matchOptions, max_results, candidates_, 0,
                   candidates_.size(), result);
-    return heap_to_vector(move(result));
+    return finalize(
+        new_query, matchOptions, options.record_match_indexes, move(result));
   }
 
   vector<ResultHeap> thread_results(num_threads);
@@ -145,11 +158,12 @@ vector<MatchResult> MatcherBase::findMatches(const std::string &query,
       thread_results[i].pop();
     }
   }
-  return heap_to_vector(move(combined));
+  return finalize(
+      new_query, matchOptions, options.record_match_indexes, move(combined));
 }
 
 void MatcherBase::addCandidate(const string &candidate) {
-  string lowercase = str_to_lower(candidate);
+  string lowercase = str_to_lower(candidate.c_str());
   int bitmask = letter_bitmask(lowercase.c_str());
   candidates_[candidate] = CandidateData {
     .lowercase = move(lowercase),

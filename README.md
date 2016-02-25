@@ -20,6 +20,9 @@ export type MatcherOptions = {
 
   // Default: 1
   numThreads?: number,
+
+  // Default: false
+  recordMatchIndexes?: boolean,
 }
 
 export type MatchResult = {
@@ -28,6 +31,10 @@ export type MatchResult = {
   // A number in the range (0-1]. Higher scores are more relevant.
   // 0 denotes "no match" and will never be returned.
   score: number,
+
+  // Matching character index in `value` for each character in `query`.
+  // This can be costly, so this is only returned if `recordMatchIndexes` was set in `options`.
+  matchIndexes?: Array<number>,
 }
 
 export class Matcher {

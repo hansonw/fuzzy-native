@@ -94,6 +94,21 @@ describe('fuzzy-native', function() {
     ]);
   });
 
+  it('can return matchIndexes', function() {
+    var result = matcher.match('abc', {recordMatchIndexes: true});
+    expect(result[0].matchIndexes).toEqual([0, 1, 2]);
+    expect(result[1].matchIndexes).toEqual([0, 1, 2]);
+    // alphabetacappa
+    //     __   _
+    expect(result[2].matchIndexes).toEqual([4, 5, 9]);
+    expect(result[3].matchIndexes).toEqual([4, 5, 9]);
+
+    result = matcher.match('t/i/a/t/d', {recordMatchIndexes: true});
+    // /this/is/a/test/dir',
+    //  _   __ ____   __
+    expect(result[0].matchIndexes).toEqual([1, 5, 6, 8, 9, 10, 11, 15, 16]);
+  });
+
   it('supports modification', function() {
     var result = matcher.match('abc', {maxResults: 1});
     expect(values(result)).toEqual([

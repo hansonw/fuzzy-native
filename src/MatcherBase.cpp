@@ -78,22 +78,19 @@ void thread_worker(
   ResultHeap &result
 ) {
   int bitmask = letter_bitmask(query.c_str());
-  size_t i = 0;
-  for (const auto& candidate : candidates) {
-    if (i >= start && (bitmask & candidate.second.bitmask) == bitmask) {
-      double score = score_match(
-        candidate.first.c_str(),
-        candidate.second.lowercase.c_str(),
-        query.c_str(),
-        options
-      );
-      if (score > 0) {
-        push_heap(result, score, candidate.first.c_str(), max_results);
+  for (size_t i = start; i < end; i++) {
+    for (auto it = candidates.begin(i); it != candidates.end(i); ++it) {
+      if ((bitmask & it->second.bitmask) == bitmask) {
+        double score = score_match(
+          it->first.c_str(),
+          it->second.lowercase.c_str(),
+          query.c_str(),
+          options
+        );
+        if (score > 0) {
+          push_heap(result, score, it->first.c_str(), max_results);
+        }
       }
-    }
-    i++;
-    if (i == end) {
-      break;
     }
   }
 }
@@ -122,7 +119,7 @@ vector<MatchResult> MatcherBase::findMatches(const std::string &query,
   if (num_threads == 0 || candidates_.size() < 10000) {
     ResultHeap result;
     thread_worker(new_query, matchOptions, max_results, candidates_, 0,
-                  candidates_.size(), result);
+                  candidates_.bucket_count(), result);
     return finalize(
         new_query, matchOptions, options.record_match_indexes, move(result));
   }
@@ -131,9 +128,9 @@ vector<MatchResult> MatcherBase::findMatches(const std::string &query,
   vector<thread> threads;
   size_t cur_start = 0;
   for (size_t i = 0; i < num_threads; i++) {
-    size_t chunk_size = candidates_.size() / num_threads;
+    size_t chunk_size = candidates_.bucket_count() / num_threads;
     // Distribute remainder among the chunks.
-    if (i < candidates_.size() % num_threads) {
+    if (i < candidates_.bucket_count() % num_threads) {
       chunk_size++;
     }
     threads.emplace_back(

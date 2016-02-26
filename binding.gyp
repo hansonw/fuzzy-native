@@ -20,6 +20,15 @@
         'src/score_match.cpp',
         'src/MatcherBase.cpp',
       ],
+      'conditions': [
+        ['OS == "win"', {
+          'defines': ['_HAS_EXCEPTIONS'],
+          'msvs_disabled_warnings': [
+            4267,  # conversion from 'size_t' to 'int', possible loss of data
+            4530,  # exception unwinding
+          ],
+        }],
+      ],
     },
     {
       'target_name': 'action_after_build',

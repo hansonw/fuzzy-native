@@ -102,9 +102,9 @@ vector<MatchResult> MatcherBase::findMatches(const std::string &query,
   if (max_results == 0) {
     max_results = numeric_limits<size_t>::max();
   }
-  MatchOptions matchOptions = {
-    .case_sensitive = options.case_sensitive,
-  };
+  MatchOptions matchOptions;
+  matchOptions.case_sensitive = options.case_sensitive;
+
   string new_query;
   // Ignore all whitespace in the query.
   for (auto c : query) {
@@ -163,8 +163,8 @@ void MatcherBase::addCandidate(const string &candidate) {
   string lowercase = str_to_lower(candidate.c_str());
   int bitmask = letter_bitmask(lowercase.c_str());
   candidates_[candidate] = CandidateData {
-    .lowercase = move(lowercase),
-    .bitmask = bitmask,
+    move(lowercase),
+    bitmask
   };
 }
 

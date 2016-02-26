@@ -13,10 +13,10 @@
 using namespace std;
 
 // Maximum allowed distance between two consecutive match characters.
-constexpr size_t MAX_DISTANCE = 10;
+const size_t MAX_DISTANCE = 10;
 
 // Bail if the state space exceeds this limit.
-constexpr size_t MAX_MEMO_SIZE = 10000;
+const size_t MAX_MEMO_SIZE = 10000;
 
 // Convenience structure for passing around during recursion.
 struct MatchInfo {
@@ -128,7 +128,11 @@ double score_match(const char *haystack, const char *haystack_lower,
   m.needle_len = strlen(needle);
   m.haystack_case = options.case_sensitive ? haystack : haystack_lower;
 
+#ifdef _WIN32
+  int *last_match = (int*)_malloca(m.needle_len * sizeof(int));
+#else
   int last_match[m.needle_len];
+#endif
   m.last_match = last_match;
 
   // Check if the needle exists in the haystack at all.
@@ -161,7 +165,11 @@ double score_match(const char *haystack, const char *haystack_lower,
     m.best_match = nullptr;
   }
 
+#ifdef _WIN32
+  double *memo = (double*)_malloca(memo_size * sizeof(double));
+#else
   double memo[memo_size];
+#endif
   fill(memo, memo + memo_size, -1);
   m.memo = memo;
   double score = recursive_match(m, 0, 0);

@@ -32,7 +32,7 @@ inline string str_to_lower(const char *s) {
 
 // Push a new entry on the heap while ensuring size <= max_results.
 void push_heap(ResultHeap &heap,
-               double score,
+               float score,
                const char *value,
                size_t max_results) {
   if (heap.size() < max_results || score > heap.top().score) {
@@ -81,7 +81,7 @@ void thread_worker(
   for (size_t i = start; i < end; i++) {
     for (auto it = candidates.begin(i); it != candidates.end(i); ++it) {
       if ((bitmask & it->second.bitmask) == bitmask) {
-        double score = score_match(
+        float score = score_match(
           it->first.c_str(),
           it->second.lowercase.c_str(),
           query.c_str(),

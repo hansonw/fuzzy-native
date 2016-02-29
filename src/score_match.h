@@ -18,6 +18,8 @@ struct MatchOptions {
  * If match_indexes is non-null, the optimal match index in haystack
  * will be computed for each value in needle.
  */
-double score_match(const char *haystack, const char *haystack_lower,
-                   const char *needle, const MatchOptions &options,
-                   std::vector<int> *match_indexes = nullptr);
+float score_match(const char *haystack,
+                  const char *haystack_lower,
+                  const char *needle,
+                  const MatchOptions &options,
+                  std::vector<int> *match_indexes = nullptr);

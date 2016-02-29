@@ -26,7 +26,7 @@ struct MatchInfo {
   const char *needle;
   size_t needle_len;
   int* last_match;
-  double *memo;
+  float *memo;
   size_t *best_match;
 };
 
@@ -52,19 +52,19 @@ struct MatchInfo {
  * We use a memoized-recursive implementation, since the state space tends to
  * be relatively sparse in most practical use cases.
  */
-double recursive_match(const MatchInfo &m,
+float recursive_match(const MatchInfo &m,
                        const size_t haystack_idx,
                        const size_t needle_idx) {
   if (needle_idx == m.needle_len) {
     return 0;
   }
 
-  double &memoized = m.memo[needle_idx * m.haystack_len + haystack_idx];
+  float &memoized = m.memo[needle_idx * m.haystack_len + haystack_idx];
   if (memoized != -1) {
     return memoized;
   }
 
-  double score = -1e9;
+  float score = -1e9;
   size_t best_match = 0;
   char c = m.needle[needle_idx];
 
@@ -83,7 +83,7 @@ double recursive_match(const MatchInfo &m,
     }
     if (c == d) {
       // calculate score
-      double char_score = 1.0;
+      float char_score = 1.0;
       size_t distance = needle_idx ? j - haystack_idx + 1 : 0;
 
       if (distance > 1) {
@@ -105,11 +105,11 @@ double recursive_match(const MatchInfo &m,
         }
       }
 
-      double new_score = char_score + recursive_match(m, j + 1, needle_idx + 1);
+      float new_score = char_score + recursive_match(m, j + 1, needle_idx + 1);
       // Scale the score based on how much of the path was actually used.
       // (We measure this via # of characters since the last slash.)
       if (needle_idx == 0) {
-        new_score /= double(m.haystack_len - last_slash);
+        new_score /= float(m.haystack_len - last_slash);
       }
       if (new_score > score) {
         score = new_score;
@@ -124,9 +124,11 @@ double recursive_match(const MatchInfo &m,
   return memoized = score;
 }
 
-double score_match(const char *haystack, const char *haystack_lower,
-                   const char *needle, const MatchOptions &options,
-                   vector<int> *match_indexes) {
+float score_match(const char *haystack,
+                  const char *haystack_lower,
+                  const char *needle,
+                  const MatchOptions &options,
+                  vector<int> *match_indexes) {
   if (!*needle) {
     // Prefer smaller haystacks.
     return 1.0 / (strlen(haystack) + 1);
@@ -174,13 +176,13 @@ double score_match(const char *haystack, const char *haystack_lower,
   }
 
 #ifdef _WIN32
-  double *memo = (double*)_malloca(memo_size * sizeof(double));
+  float *memo = (float*)_malloca(memo_size * sizeof(float));
 #else
-  double memo[memo_size];
+  float memo[memo_size];
 #endif
   fill(memo, memo + memo_size, -1);
   m.memo = memo;
-  double score = recursive_match(m, 0, 0);
+  float score = recursive_match(m, 0, 0);
 
   if (match_indexes != nullptr) {
     match_indexes->resize(m.needle_len);

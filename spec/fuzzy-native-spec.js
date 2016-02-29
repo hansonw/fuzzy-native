@@ -23,6 +23,10 @@ describe('fuzzy-native', function() {
       '/////ThisIsATestDir',
       '/this/is/a/test/dir',
       '/test/tiatd',
+      '/zzz/path2/path3/path4',
+      '/path1/zzz/path3/path4',
+      '/path1/path2/zzz/path4',
+      '/path1/path2/path3/zzz',
     ]);
   });
 
@@ -44,8 +48,8 @@ describe('fuzzy-native', function() {
     result = matcher.match('tiatd');
     expect(values(result)).toEqual([
       '/test/tiatd',
-      '/this/is/a/test/dir',
       '/////ThisIsATestDir',
+      '/this/is/a/test/dir',
       'thisisatestdir',
     ]);
 
@@ -77,6 +81,16 @@ describe('fuzzy-native', function() {
     expect(values(result)).toEqual([
       'abC',
       'AlphaBetaCappa',
+    ]);
+  });
+
+  it('favours shallow matches', function() {
+    var result = matcher.match('zzz', {caseSensitive: true});
+    expect(values(result)).toEqual([
+      '/path1/path2/path3/zzz',
+      '/path1/path2/zzz/path4',
+      '/path1/zzz/path3/path4',
+      '/zzz/path2/path3/path4',
     ]);
   });
 

@@ -26,7 +26,6 @@ struct MatchInfo {
   const char *needle;
   size_t needle_len;
   int* last_match;
-  double max_score_per_char;
   double *memo;
   size_t *best_match;
 };
@@ -74,34 +73,44 @@ double recursive_match(const MatchInfo &m,
     lim = haystack_idx + MAX_DISTANCE;
   }
 
+  // This is only used when needle_idx == haystack_idx == 0.
+  // It won't be accurate for any other run.
+  size_t last_slash = 0;
   for (size_t j = haystack_idx; j <= lim; j++) {
-    if (c == m.haystack_case[j]) {
+    char d = m.haystack_case[j];
+    if (needle_idx == 0 && (d == '/' || d == '\\')) {
+      last_slash = j;
+    }
+    if (c == d) {
       // calculate score
-      double score_for_char = m.max_score_per_char;
-      double factor = 1.0;
+      double char_score = 1.0;
       size_t distance = needle_idx ? j - haystack_idx + 1 : 0;
 
       if (distance > 1) {
         char last = m.haystack[j - 1];
         char curr = m.haystack[j]; // case matters, so get again
         if (last == '/') {
-          factor = 0.9;
+          char_score = 0.9;
         } else if (last == '-' || last == '_' || last == ' ' ||
                    (last >= '0' && last <= '9')) {
-          factor = 0.8;
+          char_score = 0.8;
         } else if (last >= 'a' && last <= 'z' && curr >= 'A' && curr <= 'Z') {
-          factor = 0.8;
+          char_score = 0.8;
         } else if (last == '.') {
-          factor = 0.7;
+          char_score = 0.7;
         } else {
-          // if no "special" chars behind char, factor diminishes
+          // if no "special" chars behind char, char_score diminishes
           // as distance from last matched char increases
-          factor = 0.75 / distance;
+          char_score = 0.75 / distance;
         }
       }
 
-      double new_score =
-          score_for_char * factor + recursive_match(m, j + 1, needle_idx + 1);
+      double new_score = char_score + recursive_match(m, j + 1, needle_idx + 1);
+      // Scale the score based on how much of the path was actually used.
+      // (We measure this via # of characters since the last slash.)
+      if (needle_idx == 0) {
+        new_score /= double(m.haystack_len - last_slash);
+      }
       if (new_score > score) {
         score = new_score;
         best_match = j;
@@ -119,8 +128,8 @@ double score_match(const char *haystack, const char *haystack_lower,
                    const char *needle, const MatchOptions &options,
                    vector<int> *match_indexes) {
   if (!*needle) {
-    // Not much we can do here - we'll end up with a random selection.
-    return 1;
+    // Prefer smaller haystacks.
+    return 1.0 / (strlen(haystack) + 1);
   }
 
   MatchInfo m;
@@ -151,12 +160,11 @@ double score_match(const char *haystack, const char *haystack_lower,
 
   m.haystack = haystack;
   m.needle = needle;
-  m.max_score_per_char = (1.0 / m.haystack_len + 1.0 / m.needle_len) / 2;
 
   size_t memo_size = m.haystack_len * m.needle_len;
   if (memo_size >= MAX_MEMO_SIZE) {
     // Use a reasonable estimate.
-    return m.max_score_per_char * m.needle_len * 0.75 / 2;
+    return 0.75 / m.haystack_len;
   }
 
   if (match_indexes != nullptr) {

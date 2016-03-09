@@ -5,6 +5,7 @@
   "main": "lib/main.js",
   "scripts": {
     "test": "jasmine-node --captureExceptions spec",
+    "build": "node-pre-gyp build",
     "rebuild": "node-pre-gyp rebuild",
     "install": "node-pre-gyp install --fallback-to-build",
     "prepublish": "node tools/prepublish.js"

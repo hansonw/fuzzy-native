@@ -44,6 +44,7 @@ void push_heap(ResultHeap &heap,
 }
 
 vector<MatchResult> finalize(const string &query,
+                             const string &query_case,
                              const MatchOptions &options,
                              bool record_match_indexes,
                              ResultHeap &&heap) {
@@ -57,6 +58,7 @@ vector<MatchResult> finalize(const string &query,
         result.value,
         lower.c_str(),
         query.c_str(),
+        query_case.c_str(),
         options,
         result.matchIndexes.get()
       );
@@ -70,6 +72,7 @@ vector<MatchResult> finalize(const string &query,
 
 void thread_worker(
   const string &query,
+  const string &query_case,
   const MatchOptions &options,
   size_t max_results,
   const unordered_map<string, MatcherBase::CandidateData> &candidates,
@@ -85,6 +88,7 @@ void thread_worker(
           it->first.c_str(),
           it->second.lowercase.c_str(),
           query.c_str(),
+          query_case.c_str(),
           options
         );
         if (score > 0) {
@@ -104,6 +108,7 @@ vector<MatchResult> MatcherBase::findMatches(const std::string &query,
   }
   MatchOptions matchOptions;
   matchOptions.case_sensitive = options.case_sensitive;
+  matchOptions.smart_case = false;
 
   string new_query;
   // Ignore all whitespace in the query.
@@ -111,52 +116,63 @@ vector<MatchResult> MatcherBase::findMatches(const std::string &query,
     if (!isspace(c)) {
       new_query += c;
     }
-  }
-  if (!options.case_sensitive) {
-    new_query = str_to_lower(new_query.c_str());
-  }
-
-  if (num_threads == 0 || candidates_.size() < 10000) {
-    ResultHeap result;
-    thread_worker(new_query, matchOptions, max_results, candidates_, 0,
-                  candidates_.bucket_count(), result);
-    return finalize(
-        new_query, matchOptions, options.record_match_indexes, move(result));
-  }
-
-  vector<ResultHeap> thread_results(num_threads);
-  vector<thread> threads;
-  size_t cur_start = 0;
-  for (size_t i = 0; i < num_threads; i++) {
-    size_t chunk_size = candidates_.bucket_count() / num_threads;
-    // Distribute remainder among the chunks.
-    if (i < candidates_.bucket_count() % num_threads) {
-      chunk_size++;
+    if (isupper(c) && !matchOptions.case_sensitive) {
+      matchOptions.smart_case = true;
     }
-    threads.emplace_back(
-      thread_worker,
-      ref(new_query),
-      ref(matchOptions),
-      max_results,
-      ref(candidates_),
-      cur_start,
-      cur_start + chunk_size,
-      ref(thread_results[i])
-    );
-    cur_start += chunk_size;
+  }
+
+  string query_case;
+  if (!options.case_sensitive) {
+    query_case = str_to_lower(new_query.c_str());
+  } else {
+    query_case = query;
   }
 
   ResultHeap combined;
-  for (size_t i = 0; i < num_threads; i++) {
-    threads[i].join();
-    while (thread_results[i].size()) {
-      auto &top = thread_results[i].top();
-      push_heap(combined, top.score, top.value, max_results);
-      thread_results[i].pop();
+  if (num_threads == 0 || candidates_.size() < 10000) {
+    thread_worker(new_query, query_case, matchOptions, max_results,
+                  candidates_, 0, candidates_.bucket_count(), combined);
+  } else {
+    vector<ResultHeap> thread_results(num_threads);
+    vector<thread> threads;
+    size_t cur_start = 0;
+    for (size_t i = 0; i < num_threads; i++) {
+      size_t chunk_size = candidates_.bucket_count() / num_threads;
+      // Distribute remainder among the chunks.
+      if (i < candidates_.bucket_count() % num_threads) {
+        chunk_size++;
+      }
+      threads.emplace_back(
+        thread_worker,
+        ref(new_query),
+        ref(query_case),
+        ref(matchOptions),
+        max_results,
+        ref(candidates_),
+        cur_start,
+        cur_start + chunk_size,
+        ref(thread_results[i])
+      );
+      cur_start += chunk_size;
+    }
+
+    for (size_t i = 0; i < num_threads; i++) {
+      threads[i].join();
+      while (thread_results[i].size()) {
+        auto &top = thread_results[i].top();
+        push_heap(combined, top.score, top.value, max_results);
+        thread_results[i].pop();
+      }
     }
   }
+
   return finalize(
-      new_query, matchOptions, options.record_match_indexes, move(combined));
+    new_query,
+    query_case,
+    matchOptions,
+    options.record_match_indexes,
+    move(combined)
+  );
 }
 
 void MatcherBase::addCandidate(const string &candidate) {

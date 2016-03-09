@@ -24,10 +24,12 @@ struct MatchInfo {
   const char *haystack_case;
   size_t haystack_len;
   const char *needle;
+  const char *needle_case;
   size_t needle_len;
   int* last_match;
   float *memo;
   size_t *best_match;
+  bool smart_case;
 };
 
 /**
@@ -66,7 +68,7 @@ float recursive_match(const MatchInfo &m,
 
   float score = -1e9;
   size_t best_match = 0;
-  char c = m.needle[needle_idx];
+  char c = m.needle_case[needle_idx];
 
   size_t lim = m.last_match[needle_idx];
   if (needle_idx > 0 && haystack_idx + MAX_DISTANCE < lim) {
@@ -105,6 +107,10 @@ float recursive_match(const MatchInfo &m,
         }
       }
 
+      if (m.smart_case && m.needle[needle_idx] != m.haystack[j]) {
+        char_score *= 0.5;
+      }
+
       float new_score = char_score + recursive_match(m, j + 1, needle_idx + 1);
       // Scale the score based on how much of the path was actually used.
       // (We measure this via # of characters since the last slash.)
@@ -127,6 +133,7 @@ float recursive_match(const MatchInfo &m,
 float score_match(const char *haystack,
                   const char *haystack_lower,
                   const char *needle,
+                  const char *needle_lower,
                   const MatchOptions &options,
                   vector<int> *match_indexes) {
   if (!*needle) {
@@ -138,6 +145,8 @@ float score_match(const char *haystack,
   m.haystack_len = strlen(haystack);
   m.needle_len = strlen(needle);
   m.haystack_case = options.case_sensitive ? haystack : haystack_lower;
+  m.needle_case = options.case_sensitive ? needle : needle_lower;
+  m.smart_case = options.smart_case;
 
 #ifdef _WIN32
   int *last_match = (int*)_malloca(m.needle_len * sizeof(int));
@@ -151,7 +160,7 @@ float score_match(const char *haystack,
   // character (which prunes the search space by a ton)
   int hindex = m.haystack_len - 1;
   for (int i = m.needle_len - 1; i >= 0; i--) {
-    while (hindex >= 0 && m.haystack_case[hindex] != needle[i]) {
+    while (hindex >= 0 && m.haystack_case[hindex] != m.needle_case[i]) {
       hindex--;
     }
     if (hindex < 0) {

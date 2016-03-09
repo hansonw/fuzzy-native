@@ -97,7 +97,7 @@ public:
     for (const auto &match : matches) {
       auto obj = New<v8::Object>();
       Set(obj, scoreKey, New(match.score));
-      Set(obj, valueKey, New(match.value).ToLocalChecked());
+      Set(obj, valueKey, New(*match.value).ToLocalChecked());
       if (match.matchIndexes != nullptr) {
         auto array = New<v8::Array>(match.matchIndexes->size());
         for (size_t i = 0; i < array->Length(); i++) {

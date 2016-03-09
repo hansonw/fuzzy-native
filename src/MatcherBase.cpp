@@ -33,7 +33,7 @@ inline string str_to_lower(const char *s) {
 // Push a new entry on the heap while ensuring size <= max_results.
 void push_heap(ResultHeap &heap,
                float score,
-               const char *value,
+               const std::string *value,
                size_t max_results) {
   if (heap.size() < max_results || score > heap.top().score) {
     heap.emplace(score, value);
@@ -53,9 +53,9 @@ vector<MatchResult> finalize(const string &query,
     const MatchResult &result = heap.top();
     if (record_match_indexes) {
       result.matchIndexes.reset(new vector<int>(query.size()));
-      string lower = str_to_lower(result.value);
+      string lower = str_to_lower(result.value->c_str());
       score_match(
-        result.value,
+        result.value->c_str(),
         lower.c_str(),
         query.c_str(),
         query_case.c_str(),
@@ -92,7 +92,7 @@ void thread_worker(
           options
         );
         if (score > 0) {
-          push_heap(result, score, it->first.c_str(), max_results);
+          push_heap(result, score, &it->first, max_results);
         }
       }
     }

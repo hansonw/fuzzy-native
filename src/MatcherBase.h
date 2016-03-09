@@ -16,15 +16,20 @@ struct MatchResult {
   float score;
   // We can't afford to copy strings around while we're ranking them.
   // These are not guaranteed to last very long and should be copied out ASAP.
-  const char* value;
+  const std::string *value;
   // Only computed if `record_match_indexes` was set to true.
   mutable std::shared_ptr<std::vector<int>> matchIndexes = nullptr;
 
-  MatchResult(float score, const char *value) : score(score), value(value) {}
+  MatchResult(float score, const std::string *value)
+    : score(score), value(value) {}
 
   // Order small scores to the top of any priority queue.
   // We need a min-heap to maintain the top-N results.
   bool operator<(const MatchResult& other) const {
+    // In case of a tie, favour shorter strings.
+    if (score == other.score) {
+      return value->length() < other.value->length();
+    }
     return score > other.score;
   }
 };

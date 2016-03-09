@@ -117,6 +117,12 @@ describe('fuzzy-native', function() {
     ]);
   });
 
+  it('breaks ties by length', function() {
+    matcher.setCandidates(['123/a', '12/a', '1/a']);
+    var result = matcher.match('a');
+    expect(values(result)).toEqual(['1/a', '12/a', '123/a']);
+  });
+
   it('can limit to maxResults', function() {
     var result = matcher.match('abc', {maxResults: 1});
     expect(values(result)).toEqual([

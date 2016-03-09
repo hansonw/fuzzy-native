@@ -103,6 +103,20 @@ describe('fuzzy-native', function() {
     ]);
   });
 
+  it('prefers whole words', function() {
+    matcher.setCandidates([
+      'testa',
+      'testA',
+      'tes/A',
+    ]);
+    var result = matcher.match('a');
+    expect(values(result)).toEqual([
+      'tes/A',
+      'testA',
+      'testa',
+    ]);
+  });
+
   it('can limit to maxResults', function() {
     var result = matcher.match('abc', {maxResults: 1});
     expect(values(result)).toEqual([
@@ -122,8 +136,9 @@ describe('fuzzy-native', function() {
     expect(result[0].matchIndexes).toEqual([0, 1, 2]);
     expect(result[1].matchIndexes).toEqual([0, 1, 2]);
     // alphabetacappa
-    //     __   _
-    expect(result[2].matchIndexes).toEqual([4, 5, 9]);
+    // _    _   _
+    expect(result[2].matchIndexes).toEqual([0, 5, 9]);
+    // here "aBetaC" is fine
     expect(result[3].matchIndexes).toEqual([4, 5, 9]);
 
     result = matcher.match('t/i/a/t/d', {recordMatchIndexes: true});

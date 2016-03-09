@@ -86,7 +86,10 @@ float recursive_match(const MatchInfo &m,
     if (c == d) {
       // calculate score
       float char_score = 1.0;
-      size_t distance = needle_idx ? j - haystack_idx + 1 : 0;
+      size_t distance = j - haystack_idx + 1;
+      if (needle_idx == 0 && distance > 2) {
+        distance = 2;
+      }
 
       if (distance > 1) {
         char last = m.haystack[j - 1];

@@ -16,7 +16,6 @@ var rimraf = require('rimraf');
 rimraf.sync('./build');
 
 var versions = [
-  '0.12.0',
   '2.0.0',
   '3.0.0',
   '4.0.0',
@@ -34,7 +33,7 @@ Object.keys(matrix).forEach(function(arch) {
       targets.push({
         target: version,
         target_platform: platform,
-        target_arch: arch
+        target_arch: arch,
       });
     });
   });

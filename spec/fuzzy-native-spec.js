@@ -68,6 +68,10 @@ describe('fuzzy-native', function() {
       'AlphaBetaCappa',
       'alphabetacappa',
     ]);
+
+    // There was a bug where this would result in a match.
+    result = matcher.match('abcc');
+    expect(result).toEqual([]);
   });
 
   it('can do a case-sensitive search', function() {

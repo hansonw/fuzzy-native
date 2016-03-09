@@ -169,7 +169,7 @@ float score_match(const char *haystack,
     if (hindex < 0) {
       return 0;
     }
-    last_match[i] = hindex;
+    last_match[i] = hindex--;
   }
 
   m.haystack = haystack;
@@ -178,7 +178,7 @@ float score_match(const char *haystack,
   size_t memo_size = m.haystack_len * m.needle_len;
   if (memo_size >= MAX_MEMO_SIZE) {
     // Use a reasonable estimate.
-    return 0.75 / m.haystack_len;
+    return 0.75 * m.needle_len / m.haystack_len;
   }
 
   if (match_indexes != nullptr) {

@@ -48,8 +48,8 @@ describe('fuzzy-native', function() {
     result = matcher.match('tiatd');
     expect(values(result)).toEqual([
       '/test/tiatd',
-      '/////ThisIsATestDir',
       '/this/is/a/test/dir',
+      '/////ThisIsATestDir',
       'thisisatestdir',
     ]);
 
@@ -147,8 +147,7 @@ describe('fuzzy-native', function() {
     // alphabetacappa
     // _    _   _
     expect(result[2].matchIndexes).toEqual([0, 5, 9]);
-    // here "aBetaC" is fine
-    expect(result[3].matchIndexes).toEqual([4, 5, 9]);
+    expect(result[3].matchIndexes).toEqual([0, 5, 9]);
 
     result = matcher.match('t/i/a/t/d', {recordMatchIndexes: true});
     // /this/is/a/test/dir',
@@ -173,5 +172,20 @@ describe('fuzzy-native', function() {
     matcher.removeCandidates(['abc']);
     result = matcher.match('');
     expect(values(result)).toEqual(['def']);
+  });
+
+  it('supports large strings', function() {
+    var longString = '';
+    var indexes = [];
+    for (var i = 0; i < 1000; i++) {
+      longString += 'a';
+      indexes.push(i);
+    }
+    matcher.addCandidates([longString]);
+    expect(matcher.match(longString, {recordMatchIndexes: true})).toEqual([{
+      score: 1,
+      value: longString,
+      matchIndexes: indexes,
+    }]);
   });
 });

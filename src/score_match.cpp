@@ -15,6 +15,13 @@ using namespace std;
 // Maximum allowed distance between two consecutive match characters.
 const size_t MAX_DISTANCE = 10;
 
+// Initial multiplier when a gap is used.
+const float BASE_DISTANCE_PENALTY = 0.6;
+
+// penalty = BASE_DISTANCE_PENALTY - (dist - 1) * ADDITIONAL_DISTANCE_PENALTY.
+// Make sure this stays positive!
+const float ADDITIONAL_DISTANCE_PENALTY = 0.05;
+
 // Bail if the state space exceeds this limit.
 const size_t MAX_MEMO_SIZE = 10000;
 
@@ -34,15 +41,14 @@ struct MatchInfo {
 
 /**
  * This algorithm essentially looks for an optimal matching
- * from needle characters to matching haystack characters. We assign a score
- * to each character in the needle, and add up the scores in the end.
+ * from needle characters to matching haystack characters. We assign a multiplier
+ * to each character in the needle, and multiply the scores together in the end.
  *
  * The key insight is that we wish to reduce the distance between adjacent
- * matched characters in the haystack. Exact substring matches will receive
- * the highest score of any possible matching.
+ * matched characters in the haystack. Exact substring matches will receive a score
+ * of 1, while gaps incur significant multiplicative penalties.
  *
- * The distance penalty is waived when the haystack character appears to be
- * the start of the word. This includes cases like:
+ * We reduce the penalty for word boundaries. This includes:
  * - paths (a in /x/abc)
  * - hyphens/underscores (a in x-a or x_a)
  * - upper camelcase names (A in XyzAbc)
@@ -55,10 +61,10 @@ struct MatchInfo {
  * be relatively sparse in most practical use cases.
  */
 float recursive_match(const MatchInfo &m,
-                       const size_t haystack_idx,
-                       const size_t needle_idx) {
+                      const size_t haystack_idx,
+                      const size_t needle_idx) {
   if (needle_idx == m.needle_len) {
-    return 0;
+    return 1;
   }
 
   float &memoized = m.memo[needle_idx * m.haystack_len + haystack_idx];
@@ -66,7 +72,7 @@ float recursive_match(const MatchInfo &m,
     return memoized;
   }
 
-  float score = -1e9;
+  float score = 0;
   size_t best_match = 0;
   char c = m.needle_case[needle_idx];
 
@@ -78,6 +84,7 @@ float recursive_match(const MatchInfo &m,
   // This is only used when needle_idx == haystack_idx == 0.
   // It won't be accurate for any other run.
   size_t last_slash = 0;
+  float dist_penalty = BASE_DISTANCE_PENALTY;
   for (size_t j = haystack_idx; j <= lim; j++) {
     char d = m.haystack_case[j];
     if (needle_idx == 0 && (d == '/' || d == '\\')) {
@@ -86,12 +93,7 @@ float recursive_match(const MatchInfo &m,
     if (c == d) {
       // calculate score
       float char_score = 1.0;
-      size_t distance = j - haystack_idx + 1;
-      if (needle_idx == 0 && distance > 2) {
-        distance = 2;
-      }
-
-      if (distance > 1) {
+      if (j > haystack_idx) {
         char last = m.haystack[j - 1];
         char curr = m.haystack[j]; // case matters, so get again
         if (last == '/') {
@@ -104,17 +106,20 @@ float recursive_match(const MatchInfo &m,
         } else if (last == '.') {
           char_score = 0.7;
         } else {
-          // if no "special" chars behind char, char_score diminishes
-          // as distance from last matched char increases
-          char_score = 0.75 / distance;
+          char_score = dist_penalty;
+        }
+        // For the first character, disregard the actual distance.
+        if (needle_idx) {
+          // Make sure this stays positive.
+          dist_penalty -= ADDITIONAL_DISTANCE_PENALTY;
         }
       }
 
       if (m.smart_case && m.needle[needle_idx] != m.haystack[j]) {
-        char_score *= 0.5;
+        char_score *= 0.9;
       }
 
-      float new_score = char_score + recursive_match(m, j + 1, needle_idx + 1);
+      float new_score = char_score * recursive_match(m, j + 1, needle_idx + 1);
       // Scale the score based on how much of the path was actually used.
       // (We measure this via # of characters since the last slash.)
       if (needle_idx == 0) {
@@ -123,6 +128,10 @@ float recursive_match(const MatchInfo &m,
       if (new_score > score) {
         score = new_score;
         best_match = j;
+        // Optimization: can't score better than 1.
+        if (new_score == 1) {
+          break;
+        }
       }
     }
   }
@@ -140,8 +149,7 @@ float score_match(const char *haystack,
                   const MatchOptions &options,
                   vector<int> *match_indexes) {
   if (!*needle) {
-    // Prefer smaller haystacks.
-    return 1.0 / (strlen(haystack) + 1);
+    return 1.0;
   }
 
   MatchInfo m;
@@ -177,8 +185,18 @@ float score_match(const char *haystack,
 
   size_t memo_size = m.haystack_len * m.needle_len;
   if (memo_size >= MAX_MEMO_SIZE) {
-    // Use a reasonable estimate.
-    return 0.75 * m.needle_len / m.haystack_len;
+    // Just return the initial match.
+    float penalty = 1.0;
+    if (match_indexes != nullptr) {
+      match_indexes->resize(m.needle_len);
+      for (size_t i = 0; i < m.needle_len; i++) {
+        match_indexes->at(i) = last_match[i];
+        if (i && last_match[i] != last_match[i - 1] + 1) {
+          penalty *= BASE_DISTANCE_PENALTY;
+        }
+      }
+    }
+    return penalty * m.needle_len / m.haystack_len;
   }
 
   if (match_indexes != nullptr) {
@@ -194,7 +212,13 @@ float score_match(const char *haystack,
 #endif
   fill(memo, memo + memo_size, -1);
   m.memo = memo;
-  float score = recursive_match(m, 0, 0);
+
+  // Since we scaled by the length of haystack used,
+  // scale it back up by the needle length.
+  float score = m.needle_len * recursive_match(m, 0, 0);
+  if (score <= 0) {
+    return 0.0;
+  }
 
   if (match_indexes != nullptr) {
     match_indexes->resize(m.needle_len);

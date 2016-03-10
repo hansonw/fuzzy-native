@@ -9,35 +9,16 @@ addons:
 
 matrix:
   include:
-    # linux
-    - os: linux
-      env: NODE_VERSION="0.12" CXX="g++-4.8" # abi 14
-    - os: linux
-      env: NODE_VERSION="2" CXX="g++-4.8"    # abi 44
-    - os: linux
-      env: NODE_VERSION="3" CXX="g++-4.8"    # abi 45
     - os: linux
       env: NODE_VERSION="4" CXX="g++-4.8"    # abi 46
     - os: linux
       env: NODE_VERSION="5" CXX="g++-4.8"    # abi 47
     # os x x86
     - os: osx
-      env: NODE_VERSION="0.12" CXX="clang"
-    - os: osx
-      env: NODE_VERSION="2" CXX="clang"
-    - os: osx
-      env: NODE_VERSION="3" CXX="clang"
-    - os: osx
       env: NODE_VERSION="4" CXX="clang"
     - os: osx
       env: NODE_VERSION="5" CXX="clang"
     # osx ia32
-    - os: osx
-      env: NODE_VERSION="0.12" TARGET_ARCH="ia32" CXX="clang"
-    - os: osx
-      env: NODE_VERSION="2" TARGET_ARCH="ia32" CXX="clang"
-    - os: osx
-      env: NODE_VERSION="3" TARGET_ARCH="ia32" CXX="clang"
     - os: osx
       env: NODE_VERSION="4" TARGET_ARCH="ia32" CXX="clang"
     - os: osx
@@ -48,9 +29,6 @@ before_install:
   - source ~/.nvm/nvm.sh
   - nvm install $NODE_VERSION
   - nvm use $NODE_VERSION
-  - if [[ $NODE_VERSION == "0.10" ]]; then
-      npm -g install npm@latest-2;
-    fi
   - export PATH="./node_modules/.bin/:$PATH"
 
 install:

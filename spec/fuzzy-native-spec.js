@@ -133,8 +133,7 @@ describe('fuzzy-native', function() {
       'abC',
     ]);
 
-    // Test with multiple threads too.
-    result = matcher.match('ABC', {maxResults: 2, numThreads: 4});
+    result = matcher.match('ABC', {maxResults: 2});
     expect(values(result)).toEqual([
       'abC',
       'abcd',

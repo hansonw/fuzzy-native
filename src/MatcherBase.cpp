@@ -75,25 +75,24 @@ void thread_worker(
   const string &query_case,
   const MatchOptions &options,
   size_t max_results,
-  const unordered_map<string, MatcherBase::CandidateData> &candidates,
+  const vector<MatcherBase::CandidateData> &candidates,
   size_t start,
   size_t end,
   ResultHeap &result
 ) {
   int bitmask = letter_bitmask(query.c_str());
   for (size_t i = start; i < end; i++) {
-    for (auto it = candidates.begin(i); it != candidates.end(i); ++it) {
-      if ((bitmask & it->second.bitmask) == bitmask) {
-        float score = score_match(
-          it->first.c_str(),
-          it->second.lowercase.c_str(),
-          query.c_str(),
-          query_case.c_str(),
-          options
-        );
-        if (score > 0) {
-          push_heap(result, score, &it->first, max_results);
-        }
+    const auto &candidate = candidates[i];
+    if ((bitmask & candidate.bitmask) == bitmask) {
+      float score = score_match(
+        candidate.value.c_str(),
+        candidate.lowercase.c_str(),
+        query.c_str(),
+        query_case.c_str(),
+        options
+      );
+      if (score > 0) {
+        push_heap(result, score, &candidate.value, max_results);
       }
     }
   }
@@ -131,15 +130,15 @@ vector<MatchResult> MatcherBase::findMatches(const std::string &query,
   ResultHeap combined;
   if (num_threads == 0 || candidates_.size() < 10000) {
     thread_worker(new_query, query_case, matchOptions, max_results,
-                  candidates_, 0, candidates_.bucket_count(), combined);
+                  candidates_, 0, candidates_.size(), combined);
   } else {
     vector<ResultHeap> thread_results(num_threads);
     vector<thread> threads;
     size_t cur_start = 0;
     for (size_t i = 0; i < num_threads; i++) {
-      size_t chunk_size = candidates_.bucket_count() / num_threads;
+      size_t chunk_size = candidates_.size() / num_threads;
       // Distribute remainder among the chunks.
-      if (i < candidates_.bucket_count() % num_threads) {
+      if (i < candidates_.size() % num_threads) {
         chunk_size++;
       }
       threads.emplace_back(
@@ -176,26 +175,40 @@ vector<MatchResult> MatcherBase::findMatches(const std::string &query,
 }
 
 void MatcherBase::addCandidate(const string &candidate) {
-  string lowercase = str_to_lower(candidate.c_str());
-  int bitmask = letter_bitmask(lowercase.c_str());
-  candidates_[candidate] = CandidateData {
-    move(lowercase),
-    bitmask
-  };
+  auto it = lookup_.find(candidate);
+  if (it == lookup_.end()) {
+    string lowercase = str_to_lower(candidate.c_str());
+    lookup_[candidate] = candidates_.size();
+    CandidateData data;
+    data.value = candidate;
+    data.bitmask = letter_bitmask(lowercase.c_str());
+    data.lowercase = move(lowercase);
+    candidates_.emplace_back(move(data));
+  }
 }
 
 void MatcherBase::removeCandidate(const string &candidate) {
-  candidates_.erase(candidate);
+  auto it = lookup_.find(candidate);
+  if (it != lookup_.end()) {
+    if (it->second + 1 != candidates_.size()) {
+      swap(candidates_[it->second], candidates_.back());
+      lookup_[candidates_[it->second].value] = it->second;
+    }
+    candidates_.pop_back();
+    lookup_.erase(candidate);
+  }
 }
 
 void MatcherBase::clear() {
   candidates_.clear();
+  lookup_.clear();
 }
 
 void MatcherBase::reserve(size_t n) {
   candidates_.reserve(n);
+  lookup_.reserve(n);
 }
 
-size_t MatcherBase::size() {
+size_t MatcherBase::size() const {
   return candidates_.size();
 }

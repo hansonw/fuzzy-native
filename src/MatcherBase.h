@@ -37,6 +37,7 @@ struct MatchResult {
 class MatcherBase {
 public:
   struct CandidateData {
+    std::string value;
     std::string lowercase;
     /**
      * A bitmask of the letters (a-z) contained in the string.
@@ -53,8 +54,12 @@ public:
   void removeCandidate(const std::string &candidate);
   void clear();
   void reserve(size_t n);
-  size_t size();
+  size_t size() const;
 
 private:
-  std::unordered_map<std::string, CandidateData> candidates_;
+  // Storing candidate data in an array makes table scans significantly faster.
+  // This makes add/remove slightly more expensive, but in our case queries
+  // are significantly more frequent.
+  std::vector<CandidateData> candidates_;
+  std::unordered_map<std::string, size_t> lookup_;
 };

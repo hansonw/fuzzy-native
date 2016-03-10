@@ -1,6 +1,6 @@
 {
   "name": "fuzzy-native",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Native C++ implementation of a fuzzy string matcher.",
   "main": "lib/main.js",
   "scripts": {

@@ -108,6 +108,7 @@ vector<MatchResult> MatcherBase::findMatches(const std::string &query,
   MatchOptions matchOptions;
   matchOptions.case_sensitive = options.case_sensitive;
   matchOptions.smart_case = false;
+  matchOptions.max_gap = options.max_gap;
 
   string new_query;
   // Ignore all whitespace in the query.

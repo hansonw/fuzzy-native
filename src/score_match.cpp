@@ -12,9 +12,6 @@
 
 using namespace std;
 
-// Maximum allowed distance between two consecutive match characters.
-const size_t MAX_DISTANCE = 10;
-
 // Initial multiplier when a gap is used.
 const float BASE_DISTANCE_PENALTY = 0.6;
 
@@ -37,6 +34,7 @@ struct MatchInfo {
   float *memo;
   size_t *best_match;
   bool smart_case;
+  size_t max_gap;
 };
 
 /**
@@ -77,8 +75,8 @@ float recursive_match(const MatchInfo &m,
   char c = m.needle_case[needle_idx];
 
   size_t lim = m.last_match[needle_idx];
-  if (needle_idx > 0 && haystack_idx + MAX_DISTANCE < lim) {
-    lim = haystack_idx + MAX_DISTANCE;
+  if (needle_idx > 0 && m.max_gap && haystack_idx + m.max_gap < lim) {
+    lim = haystack_idx + m.max_gap;
   }
 
   // This is only used when needle_idx == haystack_idx == 0.
@@ -158,6 +156,7 @@ float score_match(const char *haystack,
   m.haystack_case = options.case_sensitive ? haystack : haystack_lower;
   m.needle_case = options.case_sensitive ? needle : needle_lower;
   m.smart_case = options.smart_case;
+  m.max_gap = options.max_gap;
 
 #ifdef _WIN32
   int *last_match = (int*)_malloca(m.needle_len * sizeof(int));

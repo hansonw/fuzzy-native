@@ -1,10 +1,12 @@
 #pragma once
 
+#include <cstddef>
 #include <vector>
 
 struct MatchOptions {
   bool case_sensitive;
   bool smart_case;
+  size_t max_gap;
 };
 
 /**

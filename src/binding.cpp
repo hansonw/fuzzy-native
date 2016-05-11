@@ -81,6 +81,7 @@ public:
       options.case_sensitive = get_property<bool>(options_obj, "caseSensitive");
       options.num_threads = get_property<int>(options_obj, "numThreads");
       options.max_results = get_property<int>(options_obj, "maxResults");
+      options.max_gap = get_property<int>(options_obj, "maxGap");
       options.record_match_indexes =
           get_property<bool>(options_obj, "recordMatchIndexes");
     }

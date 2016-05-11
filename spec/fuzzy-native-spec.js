@@ -97,6 +97,14 @@ describe('fuzzy-native', function() {
     ]);
   });
 
+  it('respects maxGap', function() {
+    var result = matcher.match('abc', {maxGap: 1});
+    expect(values(result)).toEqual([
+      'abC',
+      'abcd',
+    ]);
+  });
+
   it('favours shallow matches', function() {
     var result = matcher.match('zzz', {caseSensitive: true});
     expect(values(result)).toEqual([

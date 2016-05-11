@@ -9,6 +9,7 @@ struct MatcherOptions {
   bool case_sensitive = false;
   size_t num_threads = 0;
   size_t max_results = 0;
+  size_t max_gap = 0;
   bool record_match_indexes = false;
 };
 

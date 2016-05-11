@@ -28,7 +28,7 @@
   "dependencies": {
     "nan": "^2.0.0",
     "node-pre-gyp": "^0.6.5",
-    "pre-binding": "^1.0.0",
+    "pre-binding": "^1.1.0",
     "semver": "^5.0.0"
   },
   "bundledDependencies": [

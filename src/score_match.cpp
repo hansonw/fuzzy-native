@@ -12,12 +12,14 @@
 
 using namespace std;
 
-// Initial multiplier when a gap is used.
-const float BASE_DISTANCE_PENALTY = 0.6;
+// Multipliers when breaking up the match string.
+const float SLASH_PENALTY = 0.9;
+const float WORD_PENALTY = 0.8;
+const float EXT_PENALTY = 0.7;
+const float GAP_PENALTY = 0.6;
 
-// penalty = BASE_DISTANCE_PENALTY - (dist - 1) * ADDITIONAL_DISTANCE_PENALTY.
-// Make sure this stays positive!
-const float ADDITIONAL_DISTANCE_PENALTY = 0.05;
+// Mutliplier for a case mismatch.
+const float CASE_PENALTY = 0.9;
 
 // Bail if the state space exceeds this limit.
 const size_t MAX_MEMO_SIZE = 10000;
@@ -82,7 +84,6 @@ float recursive_match(const MatchInfo &m,
   // This is only used when needle_idx == haystack_idx == 0.
   // It won't be accurate for any other run.
   size_t last_slash = 0;
-  float dist_penalty = BASE_DISTANCE_PENALTY;
   for (size_t j = haystack_idx; j <= lim; j++) {
     char d = m.haystack_case[j];
     if (needle_idx == 0 && (d == '/' || d == '\\')) {
@@ -95,26 +96,21 @@ float recursive_match(const MatchInfo &m,
         char last = m.haystack[j - 1];
         char curr = m.haystack[j]; // case matters, so get again
         if (last == '/') {
-          char_score = 0.9;
+          char_score = SLASH_PENALTY;
         } else if (last == '-' || last == '_' || last == ' ' ||
                    (last >= '0' && last <= '9')) {
-          char_score = 0.8;
+          char_score = WORD_PENALTY;
         } else if (last >= 'a' && last <= 'z' && curr >= 'A' && curr <= 'Z') {
-          char_score = 0.8;
+          char_score = WORD_PENALTY;
         } else if (last == '.') {
-          char_score = 0.7;
+          char_score = EXT_PENALTY;
         } else {
-          char_score = dist_penalty;
-        }
-        // For the first character, disregard the actual distance.
-        if (needle_idx) {
-          // Make sure this stays positive.
-          dist_penalty -= ADDITIONAL_DISTANCE_PENALTY;
+          char_score = GAP_PENALTY;
         }
       }
 
       if (m.smart_case && m.needle[needle_idx] != m.haystack[j]) {
-        char_score *= 0.9;
+        char_score *= CASE_PENALTY;
       }
 
       float new_score = char_score * recursive_match(m, j + 1, needle_idx + 1);
@@ -191,7 +187,7 @@ float score_match(const char *haystack,
       for (size_t i = 0; i < m.needle_len; i++) {
         match_indexes->at(i) = last_match[i];
         if (i && last_match[i] != last_match[i - 1] + 1) {
-          penalty *= BASE_DISTANCE_PENALTY;
+          penalty *= GAP_PENALTY;
         }
       }
     }

@@ -16,8 +16,10 @@ using namespace std;
 const float BASE_DISTANCE_PENALTY = 0.6;
 
 // penalty = BASE_DISTANCE_PENALTY - (dist - 1) * ADDITIONAL_DISTANCE_PENALTY.
-// Make sure this stays positive!
 const float ADDITIONAL_DISTANCE_PENALTY = 0.05;
+
+// The lowest the distance penalty can go. Add epsilon for precision errors.
+const float MIN_DISTANCE_PENALTY = 0.2 + 1e-9;
 
 // Bail if the state space exceeds this limit.
 const size_t MAX_MEMO_SIZE = 10000;
@@ -107,8 +109,7 @@ float recursive_match(const MatchInfo &m,
           char_score = dist_penalty;
         }
         // For the first character, disregard the actual distance.
-        if (needle_idx) {
-          // Make sure this stays positive.
+        if (needle_idx && dist_penalty > MIN_DISTANCE_PENALTY) {
           dist_penalty -= ADDITIONAL_DISTANCE_PENALTY;
         }
       }

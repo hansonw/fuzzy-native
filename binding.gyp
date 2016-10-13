@@ -28,6 +28,14 @@
             4530,  # exception unwinding
           ],
         }],
+        ['OS == "linux"', {
+          'cflags': [
+            '-static',
+          ],
+          'ldflags': [
+            '-static',
+          ],
+        }],
       ],
     },
     {

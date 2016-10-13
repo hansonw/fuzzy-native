@@ -28,6 +28,11 @@
             4530,  # exception unwinding
           ],
         }],
+        ['OS == "linux"', {
+          'ldflags': [
+            '-static-libstdc++',
+          ],
+        }],
       ],
     },
     {

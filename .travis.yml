@@ -13,22 +13,20 @@ matrix:
       env: NODE_VERSION="5" CXX="g++-4.9"    # abi 47
     - os: linux
       env: NODE_VERSION="6" CXX="g++-4.9"    # abi 48
-    - os: linux
-      env: NODE_VERSION="6.5.0" CXX="g++-4.9"    # abi 49
     # os x x86
     - os: osx
       env: NODE_VERSION="5" CXX="clang"
     - os: osx
       env: NODE_VERSION="6" CXX="clang"
     - os: osx
-      env: NODE_VERSION="6.5.0" CXX="clang"
+      env: NODE_VERSION="6" CXX="clang" ELECTRON=1.3.6  # electron ABI 49
     # osx ia32
     - os: osx
       env: NODE_VERSION="5" TARGET_ARCH="ia32" CXX="clang"
     - os: osx
       env: NODE_VERSION="6" TARGET_ARCH="ia32" CXX="clang"
     - os: osx
-      env: NODE_VERSION="6.5.0" CXX="clang"
+      env: NODE_VERSION="6" TARGET_ARCH="ia32" CXX="clang" ELECTRON=1
 
 before_install:
   - rm -rf ~/.nvm/ && git clone --depth 1 "https://github.com/creationix/nvm.git" ~/.nvm
@@ -38,6 +36,12 @@ before_install:
   - export PATH="./node_modules/.bin/:$PATH"
 
 install:
+  - if [[ -n "$ELECTRON" ]]; then
+      export npm_config_target="$ELECTRON";
+      export npm_config_arch="$TARGET_ARCH";
+      export npm_config_disturl=https://atom.io/download/atom-shell;
+      export npm_config_runtime=electron;
+    fi
   - npm install
 
 script:

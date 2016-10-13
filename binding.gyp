@@ -29,11 +29,8 @@
           ],
         }],
         ['OS == "linux"', {
-          'cflags': [
-            '-static',
-          ],
           'ldflags': [
-            '-static',
+            '-static-libstdc++',
           ],
         }],
       ],

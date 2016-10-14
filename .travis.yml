@@ -11,25 +11,18 @@ matrix:
   include:
     # linux
     - os: linux   # abi 47
-      env: NODE_VERSION="5.1.1" TARGET_ARCH="x64"
+      env: NODE_VERSION="5.1.1" CXX="g++-4.9"
     - os: linux   # abi 48
-      env: NODE_VERSION="6" TARGET_ARCH="x64"
+      env: NODE_VERSION="6" CXX="g++-4.9"
     - os: linux   # abi 49
-      env: NODE_VERSION="6" ELECTRON="1.3.6" TARGET_ARCH="x64"
+      env: NODE_VERSION="6" ELECTRON="1.3.6" CXX="g++-4.9"
     # os x x86
     - os: osx
-      env: NODE_VERSION="5.1.1" TARGET_ARCH="x64" CXX="clang"
+      env: NODE_VERSION="5.1.1" CXX="clang"
     - os: osx
-      env: NODE_VERSION="6" TARGET_ARCH="x64" CXX="clang"
+      env: NODE_VERSION="6" CXX="clang"
     - os: osx
-      env: NODE_VERSION="6" ELECTRON="1.3.6" TARGET_ARCH="x64" CXX="clang"
-    # osx ia32
-    - os: osx
-      env: NODE_VERSION="5.1.1" TARGET_ARCH="ia32" CXX="clang"
-    - os: osx
-      env: NODE_VERSION="6" TARGET_ARCH="ia32" CXX="clang"
-    - os: osx
-      env: NODE_VERSION="6" ELECTRON="1.3.6" TARGET_ARCH="ia32" CXX="clang"
+      env: NODE_VERSION="6" ELECTRON="1.3.6" CXX="clang"
 
 before_install:
   - rm -rf ~/.nvm/ && git clone --depth 1 "https://github.com/creationix/nvm.git" ~/.nvm
@@ -39,21 +32,19 @@ before_install:
   - export PATH="./node_modules/.bin/:$PATH"
 
 install:
+  - if [[ -n "$ELECTRON" ]]; then
+      export npm_config_target=$ELECTRON;
+      export npm_config_disturl=https://atom.io/download/atom-shell;
+      export npm_config_runtime=electron;
+      export npm_config_build_from_source=true;
+    fi
   - npm install
 
 script:
   - if [[ -z "$ELECTRON" ]]; then
-      node-pre-gyp rebuild package testpackage \
-        --build-from-source --target_arch=$TARGET_ARCH;
-    else
-      node-pre-gyp rebuild package testpackage \
-        --runtime=electron --target=$ELECTRON \
-        --dist-url=https://atom.io/download/atom-shell \
-        --build-from-source --target_arch=$TARGET_ARCH;
-    fi
-  - if [[ "$TARGET_ARCH" == "x64" && -z "$ELECTRON" ]]; then
       npm test;
     fi
+  - node-pre-gyp package testpackage
 
 git:
   depth: 10

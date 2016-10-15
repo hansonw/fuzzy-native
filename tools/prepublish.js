@@ -15,25 +15,23 @@ var rimraf = require('rimraf');
 
 rimraf.sync('./build');
 
-var versions = [
-  '4.0.0',
-  '5.0.0',
-  '6.0.0'
+var platforms = [
+  'darwin',
+  'linux',
 ];
-var matrix = {
-  x64: ['linux', 'darwin'],
-  ia32: ['darwin']
-};
+var versions = [
+  {target: '5.0.0'},
+  {target: '6.0.0'},
+  {target: '1.3.6', runtime: 'electron'},
+];
 
 var targets = [];
-Object.keys(matrix).forEach(function(arch) {
-  matrix[arch].forEach(function(platform) {
-    versions.forEach(function(version) {
-      targets.push({
-        target: version,
-        target_platform: platform,
-        target_arch: arch,
-      });
+platforms.forEach(function(platform) {
+  versions.forEach(function(version) {
+    targets.push({
+      target: version.target,
+      runtime: version.runtime,
+      target_platform: platform,
     });
   });
 });

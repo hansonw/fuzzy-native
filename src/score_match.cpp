@@ -6,7 +6,6 @@
  * with a few modifications and extra optimizations.
  */
 
-#include <iostream>
 #include <string>
 #include <cstring>
 

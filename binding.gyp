@@ -31,6 +31,7 @@
         ['OS == "linux"', {
           'ldflags': [
             '-static-libstdc++',
+            '-s',
           ],
         }],
       ],

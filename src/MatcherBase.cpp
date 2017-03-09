@@ -19,7 +19,7 @@ inline int letter_bitmask(const char *str) {
   return result;
 }
 
-inline string str_to_lower(const char *s) {
+inline string str_to_lower(const std::string &s) {
   string lower(s);
   for (auto& c : lower) {
     if (c >= 'A' && c <= 'Z') {
@@ -52,7 +52,7 @@ vector<MatchResult> finalize(const string &query,
     const MatchResult &result = heap.top();
     if (record_match_indexes) {
       result.matchIndexes.reset(new vector<int>(query.size()));
-      string lower = str_to_lower(result.value->c_str());
+      string lower = str_to_lower(*result.value);
       score_match(
         result.value->c_str(),
         lower.c_str(),
@@ -79,7 +79,7 @@ void thread_worker(
   size_t end,
   ResultHeap &result
 ) {
-  int bitmask = letter_bitmask(query.c_str());
+  int bitmask = letter_bitmask(query_case.c_str());
   for (size_t i = start; i < end; i++) {
     const auto &candidate = candidates[i];
     if ((bitmask & candidate.bitmask) == bitmask) {
@@ -122,7 +122,7 @@ vector<MatchResult> MatcherBase::findMatches(const std::string &query,
 
   string query_case;
   if (!options.case_sensitive) {
-    query_case = str_to_lower(new_query.c_str());
+    query_case = str_to_lower(new_query);
   } else {
     query_case = query;
   }
@@ -177,7 +177,7 @@ vector<MatchResult> MatcherBase::findMatches(const std::string &query,
 void MatcherBase::addCandidate(const string &candidate) {
   auto it = lookup_.find(candidate);
   if (it == lookup_.end()) {
-    string lowercase = str_to_lower(candidate.c_str());
+    string lowercase = str_to_lower(candidate);
     lookup_[candidate] = candidates_.size();
     CandidateData data;
     data.value = candidate;

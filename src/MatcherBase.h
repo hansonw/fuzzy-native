@@ -47,6 +47,13 @@ public:
      * non-matches in many practical cases.
      */
     int bitmask;
+    /**
+     * True if this was a match against lastQuery_.
+     * Since the most common use case for this library is for typeaheads,
+     * we can often avoid a ton of work by skiping past negatives.
+     * We'll use this only if the new query strictly extends lastQuery_.
+     */
+    bool last_match;
   };
 
   std::vector<MatchResult> findMatches(const std::string &query,
@@ -63,4 +70,5 @@ private:
   // are significantly more frequent.
   std::vector<CandidateData> candidates_;
   std::unordered_map<std::string, size_t> lookup_;
+  std::string lastQuery_;
 };

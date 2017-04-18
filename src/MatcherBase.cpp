@@ -73,15 +73,19 @@ void thread_worker(
   const string &query,
   const string &query_case,
   const MatchOptions &options,
+  bool use_last_match,
   size_t max_results,
-  const vector<MatcherBase::CandidateData> &candidates,
+  vector<MatcherBase::CandidateData> &candidates,
   size_t start,
   size_t end,
   ResultHeap &result
 ) {
   int bitmask = letter_bitmask(query_case.c_str());
   for (size_t i = start; i < end; i++) {
-    const auto &candidate = candidates[i];
+    auto &candidate = candidates[i];
+    if (use_last_match && !candidate.last_match) {
+      continue;
+    }
     if ((bitmask & candidate.bitmask) == bitmask) {
       float score = score_match(
         candidate.value.c_str(),
@@ -92,6 +96,9 @@ void thread_worker(
       );
       if (score > 0) {
         push_heap(result, score, &candidate.value, max_results);
+        candidate.last_match = true;
+      } else {
+        candidate.last_match = false;
       }
     }
   }
@@ -127,10 +134,15 @@ vector<MatchResult> MatcherBase::findMatches(const std::string &query,
     query_case = query;
   }
 
+  // If our current query is just an extension of the last query,
+  // quickly ignore all previous non-matches as an optimization.
+  bool use_last_match = query_case.substr(0, lastQuery_.size()) == lastQuery_;
+  lastQuery_ = query_case;
+
   ResultHeap combined;
   if (num_threads == 0 || candidates_.size() < 10000) {
-    thread_worker(new_query, query_case, matchOptions, max_results,
-                  candidates_, 0, candidates_.size(), combined);
+    thread_worker(new_query, query_case, matchOptions, use_last_match,
+                  max_results, candidates_, 0, candidates_.size(), combined);
   } else {
     vector<ResultHeap> thread_results(num_threads);
     vector<thread> threads;
@@ -146,6 +158,7 @@ vector<MatchResult> MatcherBase::findMatches(const std::string &query,
         ref(new_query),
         ref(query_case),
         ref(matchOptions),
+        use_last_match,
         max_results,
         ref(candidates_),
         cur_start,
@@ -183,6 +196,7 @@ void MatcherBase::addCandidate(const string &candidate) {
     data.value = candidate;
     data.bitmask = letter_bitmask(lowercase.c_str());
     data.lowercase = move(lowercase);
+    data.last_match = true;
     candidates_.emplace_back(move(data));
   }
 }

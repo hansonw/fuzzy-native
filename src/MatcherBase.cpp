@@ -14,6 +14,12 @@ inline int letter_bitmask(const char *str) {
   for (int i = 0; str[i]; i++) {
     if (str[i] >= 'a' && str[i] <= 'z') {
       result |= (1 << (str[i] - 'a'));
+    } else if (str[i] == '-') {
+      result |= (1 << 26);
+    } else if (str[i] == '_') {
+      result |= (1 << 27);
+    } else if (str[i] >= '0' && str[i] <= '3') {
+      result |= (1U << (28 + str[i] - '0'));
     }
   }
   return result;

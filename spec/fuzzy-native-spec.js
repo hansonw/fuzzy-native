@@ -196,4 +196,9 @@ describe('fuzzy-native', function() {
       matchIndexes: indexes,
     }]);
   });
+
+  it('works with non-alpha characters', function() {
+    matcher.addCandidates(['-_01234', '01234-']);
+    expect(values(matcher.match('-034'))).toEqual(['-_01234']);
+  });
 });

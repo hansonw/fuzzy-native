@@ -113,8 +113,10 @@ float recursive_match(const MatchInfo &m,
         }
       }
 
+      // Apply a severe penalty if the case doesn't match.
+      // This should always hoist the exact case matches above all others.
       if (m.smart_case && m.needle[needle_idx] != m.haystack[j]) {
-        char_score *= 0.9;
+        char_score *= 0.001;
       }
 
       float new_score = char_score * recursive_match(m, j + 1, needle_idx + 1);

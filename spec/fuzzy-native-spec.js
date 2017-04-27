@@ -56,9 +56,9 @@ describe('fuzzy-native', function() {
     // Defaults to case-insensitive matching (favouring the right case).
     result = matcher.match('ABC');
     expect(values(result)).toEqual([
+      'AlphaBetaCappa',
       'abC',
       'abcd',
-      'AlphaBetaCappa',
       'alphabetacappa',
     ]);
 
@@ -143,8 +143,8 @@ describe('fuzzy-native', function() {
 
     result = matcher.match('ABC', {maxResults: 2});
     expect(values(result)).toEqual([
+      'AlphaBetaCappa',
       'abC',
-      'abcd',
     ]);
   });
 

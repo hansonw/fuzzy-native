@@ -40,8 +40,9 @@ void push_heap(ResultHeap &heap,
                float score,
                const std::string *value,
                size_t max_results) {
-  if (heap.size() < max_results || score > heap.top().score) {
-    heap.emplace(score, value);
+  MatchResult result(score, value);
+  if (heap.size() < max_results || result < heap.top()) {
+    heap.push(std::move(result));
     if (heap.size() > max_results) {
       heap.pop();
     }

@@ -129,10 +129,28 @@ describe('fuzzy-native', function() {
     ]);
   });
 
-  it('breaks ties by length', function() {
+  it('breaks ties by length if root folder is not passed', function() {
     matcher.setCandidates(['123/a', '12/a', '1/a']);
     var result = matcher.match('a');
     expect(values(result)).toEqual(['1/a', '12/a', '123/a']);
+  });
+
+  it('breaks ties by distance to root folder', function() {
+    matcher.setCandidates([
+      '/A/B/C/file.js',
+      '/A/B/file.js',
+      '/A/C/D/file.js',
+      '/A/REALLY_BIG_NAME/file.js',
+      '/A/file.js',
+    ]);
+    var result = matcher.match('file', {rootPath: '/A/B/C/'});
+    expect(values(result)).toEqual([
+      '/A/B/C/file.js',
+      '/A/B/file.js',
+      '/A/file.js',
+      '/A/REALLY_BIG_NAME/file.js',
+      '/A/C/D/file.js',
+    ]);
   });
 
   it('can limit to maxResults', function() {

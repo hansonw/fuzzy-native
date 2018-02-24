@@ -1,12 +1,14 @@
 #pragma once
 
 #include <cstddef>
+#include <string>
 #include <vector>
 
 struct MatchOptions {
   bool case_sensitive;
   bool smart_case;
   size_t max_gap;
+  std::string root_path;
 };
 
 /**

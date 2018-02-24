@@ -35,6 +35,27 @@ std::string to_std_string(const v8::Local<v8::String> &v8str) {
   return str;
 }
 
+std::string get_string_property(const v8::Local<v8::Object> &object,
+                                const char *name) {
+  auto prop =
+    Nan::Get(object, Nan::New(name).ToLocalChecked());
+  if (!prop.IsEmpty()) {
+    auto propLocal = prop.ToLocalChecked();
+    if (propLocal->IsNull() || propLocal->IsUndefined()) {
+      return std::string("");
+    }
+    if (!propLocal->IsString()) {
+      std::string msg =
+        std::string("property ") +
+        name +
+        std::string(" must be a string");
+      ThrowTypeError(msg.c_str());
+    }
+    return to_std_string(propLocal->ToString());
+  }
+  return std::string("");
+}
+
 Persistent<v8::Function> MatcherConstructor;
 
 class Matcher : public ObjectWrap {
@@ -83,6 +104,7 @@ public:
       options.max_gap = get_property<int>(options_obj, "maxGap");
       options.record_match_indexes =
           get_property<bool>(options_obj, "recordMatchIndexes");
+      options.root_path = get_string_property(options_obj, "rootPath");
     }
 
     auto valueKey = New("value").ToLocalChecked();

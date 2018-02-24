@@ -4,6 +4,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <nan.h>
 
 struct MatcherOptions {
   bool case_sensitive = false;
@@ -11,6 +12,7 @@ struct MatcherOptions {
   size_t max_results = 0;
   size_t max_gap = 0;
   bool record_match_indexes = false;
+  std::string root_path;
 };
 
 struct MatchResult {
@@ -20,16 +22,22 @@ struct MatchResult {
   const std::string *value;
   // Only computed if `record_match_indexes` was set to true.
   mutable std::shared_ptr<std::vector<int>> matchIndexes = nullptr;
+  int score_based_root_path;
 
-  MatchResult(float score, const std::string *value)
-    : score(score), value(value) {}
+  MatchResult(float score,
+              int score_based_root_path,
+              const std::string *value)
+    : score(score), value(value), score_based_root_path(score_based_root_path) {}
 
   // Order small scores to the top of any priority queue.
   // We need a min-heap to maintain the top-N results.
   bool operator<(const MatchResult& other) const {
-    // In case of a tie, favour shorter strings.
     if (score == other.score) {
-      return value->length() < other.value->length();
+      // In case of a tie, favour shorter strings.
+      if (score_based_root_path == other.score_based_root_path) {
+        return value->length() < other.value->length();
+      }
+      return score_based_root_path > other.score_based_root_path;
     }
     return score > other.score;
   }
@@ -40,6 +48,7 @@ public:
   struct CandidateData {
     std::string value;
     std::string lowercase;
+    int num_dirs;
     /**
      * A bitmask of the letters (a-z) contained in the string.
      * ('a' = 1, 'b' = 2, 'c' = 4, ...)

@@ -50,8 +50,12 @@ int num_dirs(const std::string &path) {
 }
 
 int score_based_root_path(const MatchOptions &options,
-                     const MatcherBase::CandidateData &candidate) {
+                          const MatcherBase::CandidateData &candidate) {
   const std::string &root = options.root_path;
+  if (root.length() == 0) {
+    return 0;
+  }
+  
   const std::string &value = candidate.value;
 
   size_t num_common_dirs = 0;

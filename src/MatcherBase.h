@@ -4,7 +4,6 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include <nan.h>
 
 struct MatcherOptions {
   bool case_sensitive = false;

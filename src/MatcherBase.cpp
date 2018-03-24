@@ -55,7 +55,7 @@ int score_based_root_path(const MatchOptions &options,
   if (root.length() == 0) {
     return 0;
   }
-  
+
   const std::string &value = candidate.value;
 
   size_t num_common_dirs = 0;
@@ -110,6 +110,7 @@ vector<MatchResult> finalize(const string &query,
         query.c_str(),
         query_case.c_str(),
         options,
+        0.0,
         result.matchIndexes.get()
       );
     }
@@ -132,6 +133,7 @@ void thread_worker(
   ResultHeap &result
 ) {
   int bitmask = letter_bitmask(query_case.c_str());
+  float min_score = 0.0;
   for (size_t i = start; i < end; i++) {
     auto &candidate = candidates[i];
     if (use_last_match && !candidate.last_match) {
@@ -143,7 +145,8 @@ void thread_worker(
         candidate.lowercase.c_str(),
         query.c_str(),
         query_case.c_str(),
-        options
+        options,
+        min_score
       );
       if (score > 0) {
         push_heap(
@@ -153,6 +156,9 @@ void thread_worker(
           &candidate.value,
           max_results
         );
+        if (result.size() == max_results) {
+          min_score = max(min_score, result.top().score);
+        }
         candidate.last_match = true;
       } else {
         candidate.last_match = false;

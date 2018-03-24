@@ -27,4 +27,5 @@ float score_match(const char *haystack,
                   const char *needle,
                   const char *needle_lower,
                   const MatchOptions &options,
+                  const float min_score,
                   std::vector<int> *match_indexes = nullptr);

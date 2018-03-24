@@ -69,7 +69,7 @@ float recursive_match(const MatchInfo &m,
   }
 
   float &memoized = m.memo[needle_idx * m.haystack_len + haystack_idx];
-  if (memoized != -1) {
+  if (memoized >= 0) {
     return memoized;
   }
 
@@ -230,7 +230,8 @@ float score_match(const char *haystack,
 #else
   float memo[memo_size];
 #endif
-  fill(memo, memo + memo_size, -1);
+  // This doesn't set the values to -2, but some negative number.
+  memset(memo, -2, sizeof(float) * memo_size);
   m.memo = memo;
 
   // Since we scaled by the length of haystack used,

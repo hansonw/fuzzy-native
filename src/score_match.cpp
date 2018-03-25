@@ -6,6 +6,7 @@
  * with a few modifications and extra optimizations.
  */
 
+#include <algorithm>
 #include <string>
 #include <cstring>
 

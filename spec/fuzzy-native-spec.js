@@ -173,7 +173,7 @@ describe('fuzzy-native', function() {
     // alphabetacappa
     // _    _   _
     expect(result[2].matchIndexes).toEqual([0, 5, 9]);
-    expect(result[3].matchIndexes).toEqual([0, 5, 9]);
+    expect(result[3].matchIndexes).toEqual([4, 5, 9]);
 
     result = matcher.match('t/i/a/t/d', {recordMatchIndexes: true});
     // /this/is/a/test/dir',

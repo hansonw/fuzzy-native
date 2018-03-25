@@ -18,7 +18,7 @@ const float BASE_DISTANCE_PENALTY = 0.6;
 const float ADDITIONAL_DISTANCE_PENALTY = 0.05;
 
 // The lowest the distance penalty can go. Add epsilon for precision errors.
-const float MIN_DISTANCE_PENALTY = 0.2 + 1e-9;
+const float MIN_DISTANCE_PENALTY = 0.2;
 
 // Bail if the state space exceeds this limit.
 const size_t MAX_MEMO_SIZE = 10000;
@@ -85,7 +85,6 @@ float recursive_match(const MatchInfo &m,
   // This is only used when needle_idx == haystack_idx == 0.
   // It won't be accurate for any other run.
   size_t last_slash = 0;
-  float dist_penalty = BASE_DISTANCE_PENALTY;
   for (size_t j = haystack_idx; j <= lim; j++) {
     char d = m.haystack_case[j];
     if (needle_idx == 0 && (d == '/' || d == '\\')) {
@@ -106,12 +105,14 @@ float recursive_match(const MatchInfo &m,
           char_score = 0.8;
         } else if (last == '.') {
           char_score = 0.7;
+        } else if (needle_idx == 0) {
+          char_score = BASE_DISTANCE_PENALTY;
         } else {
-          char_score = dist_penalty;
-        }
-        // For the first character, disregard the actual distance.
-        if (needle_idx && dist_penalty > MIN_DISTANCE_PENALTY) {
-          dist_penalty -= ADDITIONAL_DISTANCE_PENALTY;
+          char_score = max(
+            MIN_DISTANCE_PENALTY,
+            BASE_DISTANCE_PENALTY -
+              (haystack_idx - j - 2) * ADDITIONAL_DISTANCE_PENALTY
+          );
         }
       }
 
@@ -180,7 +181,7 @@ float score_match(const char *haystack,
   m.min_score = min_score;
 
 #ifdef _WIN32
-  int *last_match = (int*)_malloca(m.needle_len * sizeof(int));
+  int *last_match = (int*)_alloca(m.needle_len * sizeof(int));
 #else
   int last_match[m.needle_len];
 #endif
@@ -226,7 +227,7 @@ float score_match(const char *haystack,
   }
 
 #ifdef _WIN32
-  float *memo = (float*)_malloca(memo_size * sizeof(float));
+  float *memo = (float*)_alloca(memo_size * sizeof(float));
 #else
   float memo[memo_size];
 #endif

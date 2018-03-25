@@ -54,7 +54,7 @@ describe('fuzzy-native', function() {
     ]);
 
     // Defaults to case-insensitive matching (favouring the right case).
-    result = matcher.match('ABC');
+    result = matcher.match('ABC', {smartCase: true});
     expect(values(result)).toEqual([
       'AlphaBetaCappa',
       'abC',
@@ -89,7 +89,7 @@ describe('fuzzy-native', function() {
   });
 
   it('uses smart case', function() {
-    var result = matcher.match('ThisIsATestDir');
+    var result = matcher.match('ThisIsATestDir', {smartCase: true});
     expect(values(result)).toEqual([
       '/////ThisIsATestDir',
       'thisisatestdir',
@@ -159,7 +159,7 @@ describe('fuzzy-native', function() {
       'abC',
     ]);
 
-    result = matcher.match('ABC', {maxResults: 2});
+    result = matcher.match('ABC', {maxResults: 2, smartCase: true});
     expect(values(result)).toEqual([
       'AlphaBetaCappa',
       'abC',

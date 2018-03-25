@@ -4,6 +4,10 @@ export type MatcherOptions = {
   // Default: false
   caseSensitive?: boolean,
 
+  // Prefers case-sensitive matches when the query contains an uppercase letter.
+  // Default: false
+  smartCase?: boolean,
+
   // Default: infinite
   maxResults?: number,
 

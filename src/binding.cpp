@@ -99,6 +99,7 @@ public:
       CHECK(info[1]->IsObject(), "Second argument should be an options object");
       auto options_obj = info[1]->ToObject();
       options.case_sensitive = get_property<bool>(options_obj, "caseSensitive");
+      options.smart_case = get_property<bool>(options_obj, "smartCase");
       options.num_threads = get_property<int>(options_obj, "numThreads");
       options.max_results = get_property<int>(options_obj, "maxResults");
       options.max_gap = get_property<int>(options_obj, "maxGap");

@@ -186,7 +186,7 @@ vector<MatchResult> MatcherBase::findMatches(const std::string &query,
     if (!isspace(c)) {
       new_query += c;
     }
-    if (isupper(c) && !matchOptions.case_sensitive) {
+    if (options.smart_case && isupper(c) && !matchOptions.case_sensitive) {
       matchOptions.smart_case = true;
     }
   }

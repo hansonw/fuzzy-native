@@ -137,8 +137,16 @@ public:
     if (info.Length() > 0) {
       CHECK(info[0]->IsArray(), "Expected an array of strings");
       auto arg1 = v8::Local<v8::Array>::Cast(info[0]);
+      // Create a random permutation so that candidates are shuffled.
+      std::vector<size_t> indexes(arg1->Length());
+      for (size_t i = 0; i < indexes.size(); i++) {
+        indexes[i] = i;
+        if (i > 0) {
+          std::swap(indexes[rand() % i], indexes[i]);
+        }
+      }
       matcher->impl_.reserve(matcher->impl_.size() + arg1->Length());
-      for (size_t i = 0; i < arg1->Length(); i++) {
+      for (auto i: indexes) {
         matcher->impl_.addCandidate(to_std_string(arg1->Get(i)->ToString()));
       }
     }

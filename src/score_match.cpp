@@ -133,7 +133,7 @@ float recursive_match(const MatchInfo &m,
       if (m.min_score > 0) {
         next_score = cur_score * multiplier;
         // Scores only decrease. If we can't pass the previous best, bail
-        if (next_score < m.min_score || next_score < score) {
+        if (next_score < m.min_score) {
           // Ensure that score is non-zero:
           // MatcherBase shouldn't exclude this from future searches.
           if (score == 0) {

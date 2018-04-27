@@ -112,7 +112,7 @@ float recursive_match(const MatchInfo &m,
           char_score = max(
             MIN_DISTANCE_PENALTY,
             BASE_DISTANCE_PENALTY -
-              (haystack_idx - j - 2) * ADDITIONAL_DISTANCE_PENALTY
+              (j - haystack_idx - 1) * ADDITIONAL_DISTANCE_PENALTY
           );
         }
       }
@@ -209,14 +209,17 @@ float score_match(const char *haystack,
   if (memo_size >= MAX_MEMO_SIZE) {
     // Just return the initial match.
     float penalty = 1.0;
-    if (match_indexes != nullptr) {
-      match_indexes->resize(m.needle_len);
-      for (size_t i = 0; i < m.needle_len; i++) {
-        match_indexes->at(i) = last_match[i];
-        if (i && last_match[i] != last_match[i - 1] + 1) {
-          penalty *= BASE_DISTANCE_PENALTY;
-        }
+    for (size_t i = 1; i < m.needle_len; i++) {
+      int gap = last_match[i] - last_match[i - 1];
+      if (gap > 1) {
+        penalty *= max(
+          MIN_DISTANCE_PENALTY,
+          BASE_DISTANCE_PENALTY - (gap - 1) * ADDITIONAL_DISTANCE_PENALTY
+        );
       }
+    }
+    if (match_indexes != nullptr) {
+      *match_indexes = vector<int>(last_match, last_match + m.needle_len);
     }
     return penalty * m.needle_len / m.haystack_len;
   }

@@ -1,0 +1,4 @@
+# This file is here so npm doesn't use .gitignore to decide what to pack.
+# See the root package.json's "files" for what is included.
+# npm5 ignores empty .npmignore files so add something trivial.
+/node_modules

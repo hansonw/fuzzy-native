@@ -9,17 +9,24 @@ using namespace std;
 
 typedef priority_queue<MatchResult> ResultHeap;
 
-inline int letter_bitmask(const char *str) {
-  int result = 0;
-  for (int i = 0; str[i]; i++) {
-    if (str[i] >= 'a' && str[i] <= 'z') {
-      result |= (1 << (str[i] - 'a'));
-    } else if (str[i] == '-') {
-      result |= (1 << 26);
-    } else if (str[i] == '_') {
-      result |= (1 << 27);
-    } else if (str[i] >= '0' && str[i] <= '3') {
-      result |= (1U << (28 + str[i] - '0'));
+inline uint64_t letter_bitmask(const std::string &str) {
+  uint64_t result = 0;
+  for (char c : str) {
+    if (c >= 'a' && c <= 'z') {
+      int index = c - 'a';
+      uint64_t count_bit = (result >> (index * 2));
+      // "Increment" the count_bit:
+      // 00 -> 01
+      // 01 -> 11
+      // 11 -> 11
+      count_bit = ((count_bit << 1) | 1) & 3;
+      result |= count_bit << (index * 2);
+    } else if (c == '-') {
+      result |= (1UL << 52);
+    } else if (c == '_') {
+      result |= (1UL << 53);
+    } else if (c >= '0' && c <= '9') {
+      result |= (1UL << (c - '0' + 54));
     }
   }
   return result;
@@ -132,7 +139,7 @@ void thread_worker(
   size_t end,
   ResultHeap &result
 ) {
-  int bitmask = letter_bitmask(query_case.c_str());
+  uint64_t bitmask = letter_bitmask(query_case.c_str());
   float min_score = 0.0;
   for (size_t i = start; i < end; i++) {
     auto &candidate = candidates[i];

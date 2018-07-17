@@ -10,6 +10,11 @@
 #include <string>
 #include <cstring>
 
+// memrchr is a non-standard extension only available in glibc.
+#if defined(__APPLE__) || defined(_WIN32) || defined(_WIN64)
+#include "memrchr.h"
+#endif
+
 using namespace std;
 
 // Initial multiplier when a gap is used.
@@ -191,15 +196,14 @@ float score_match(const char *haystack,
   // Check if the needle exists in the haystack at all.
   // Simultaneously, we can figure out the last possible match for each needle
   // character (which prunes the search space by a ton)
-  int hindex = m.haystack_len - 1;
+  int hindex = m.haystack_len;
   for (int i = m.needle_len - 1; i >= 0; i--) {
-    while (hindex >= 0 && m.haystack_case[hindex] != m.needle_case[i]) {
-      hindex--;
-    }
-    if (hindex < 0) {
+    char* ptr = (char*)memrchr(m.haystack_case, m.needle_case[i], hindex);
+    if (ptr == nullptr) {
       return 0;
     }
-    last_match[i] = hindex--;
+    hindex = ptr - m.haystack_case;
+    last_match[i] = hindex;
   }
 
   m.haystack = haystack;

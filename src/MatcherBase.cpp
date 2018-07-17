@@ -2,6 +2,7 @@
 #include "score_match.h"
 
 #include <algorithm>
+#include <atomic>
 #include <queue>
 #include <thread>
 
@@ -133,6 +134,7 @@ void thread_worker(
   const string &query_case,
   const MatchOptions &options,
   bool use_last_match,
+  std::atomic<float>* min_score,
   size_t max_results,
   vector<MatcherBase::CandidateData> &candidates,
   size_t start,
@@ -140,7 +142,6 @@ void thread_worker(
   ResultHeap &result
 ) {
   uint64_t bitmask = letter_bitmask(query_case.c_str());
-  float min_score = 0.0;
   for (size_t i = start; i < end; i++) {
     auto &candidate = candidates[i];
     if (use_last_match && !candidate.last_match) {
@@ -153,7 +154,7 @@ void thread_worker(
         query.c_str(),
         query_case.c_str(),
         options,
-        min_score
+        min_score->load()
       );
       if (score > 0) {
         push_heap(
@@ -164,7 +165,15 @@ void thread_worker(
           max_results
         );
         if (result.size() == max_results) {
-          min_score = max(min_score, result.top().score);
+          float current_max = result.top().score;
+          float min_score_value = min_score->load();
+          // Unfortunately there's no thread-safe "max"...
+          // When running compare_exchange_weak it's possible that another
+          // thread wrote to it in the meantime, in which case we have to check
+          // again. Since it's always increasing this is guaranteed to converge.
+          while (current_max > min_score_value) {
+            min_score->compare_exchange_weak(min_score_value, current_max);
+          }
         }
         candidate.last_match = true;
       } else {
@@ -211,8 +220,9 @@ vector<MatchResult> MatcherBase::findMatches(const std::string &query,
   lastQuery_ = query_case;
 
   ResultHeap combined;
+  std::atomic<float> min_score(0);
   if (num_threads == 0 || candidates_.size() < 10000) {
-    thread_worker(new_query, query_case, matchOptions, use_last_match,
+    thread_worker(new_query, query_case, matchOptions, use_last_match, &min_score,
                   max_results, candidates_, 0, candidates_.size(), combined);
   } else {
     vector<ResultHeap> thread_results(num_threads);
@@ -230,6 +240,7 @@ vector<MatchResult> MatcherBase::findMatches(const std::string &query,
         ref(query_case),
         ref(matchOptions),
         use_last_match,
+        &min_score,
         max_results,
         ref(candidates_),
         cur_start,

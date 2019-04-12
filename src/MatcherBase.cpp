@@ -2,6 +2,7 @@
 #include "score_match.h"
 
 #include <algorithm>
+#include <atomic>
 #include <queue>
 #include <thread>
 
@@ -9,17 +10,24 @@ using namespace std;
 
 typedef priority_queue<MatchResult> ResultHeap;
 
-inline int letter_bitmask(const char *str) {
-  int result = 0;
-  for (int i = 0; str[i]; i++) {
-    if (str[i] >= 'a' && str[i] <= 'z') {
-      result |= (1 << (str[i] - 'a'));
-    } else if (str[i] == '-') {
-      result |= (1 << 26);
-    } else if (str[i] == '_') {
-      result |= (1 << 27);
-    } else if (str[i] >= '0' && str[i] <= '3') {
-      result |= (1U << (28 + str[i] - '0'));
+inline uint64_t letter_bitmask(const std::string &str) {
+  uint64_t result = 0;
+  for (char c : str) {
+    if (c >= 'a' && c <= 'z') {
+      int index = c - 'a';
+      uint64_t count_bit = (result >> (index * 2));
+      // "Increment" the count_bit:
+      // 00 -> 01
+      // 01 -> 11
+      // 11 -> 11
+      count_bit = ((count_bit << 1) | 1) & 3;
+      result |= count_bit << (index * 2);
+    } else if (c == '-') {
+      result |= (1UL << 52);
+    } else if (c == '_') {
+      result |= (1UL << 53);
+    } else if (c >= '0' && c <= '9') {
+      result |= (1UL << (c - '0' + 54));
     }
   }
   return result;
@@ -126,14 +134,14 @@ void thread_worker(
   const string &query_case,
   const MatchOptions &options,
   bool use_last_match,
+  std::atomic<float>* min_score,
   size_t max_results,
   vector<MatcherBase::CandidateData> &candidates,
   size_t start,
   size_t end,
   ResultHeap &result
 ) {
-  int bitmask = letter_bitmask(query_case.c_str());
-  float min_score = 0.0;
+  uint64_t bitmask = letter_bitmask(query_case.c_str());
   for (size_t i = start; i < end; i++) {
     auto &candidate = candidates[i];
     if (use_last_match && !candidate.last_match) {
@@ -146,7 +154,7 @@ void thread_worker(
         query.c_str(),
         query_case.c_str(),
         options,
-        min_score
+        min_score->load()
       );
       if (score > 0) {
         push_heap(
@@ -157,7 +165,15 @@ void thread_worker(
           max_results
         );
         if (result.size() == max_results) {
-          min_score = max(min_score, result.top().score);
+          float current_max = result.top().score;
+          float min_score_value = min_score->load();
+          // Unfortunately there's no thread-safe "max"...
+          // When running compare_exchange_weak it's possible that another
+          // thread wrote to it in the meantime, in which case we have to check
+          // again. Since it's always increasing this is guaranteed to converge.
+          while (current_max > min_score_value) {
+            min_score->compare_exchange_weak(min_score_value, current_max);
+          }
         }
         candidate.last_match = true;
       } else {
@@ -204,8 +220,9 @@ vector<MatchResult> MatcherBase::findMatches(const std::string &query,
   lastQuery_ = query_case;
 
   ResultHeap combined;
+  std::atomic<float> min_score(0);
   if (num_threads == 0 || candidates_.size() < 10000) {
-    thread_worker(new_query, query_case, matchOptions, use_last_match,
+    thread_worker(new_query, query_case, matchOptions, use_last_match, &min_score,
                   max_results, candidates_, 0, candidates_.size(), combined);
   } else {
     vector<ResultHeap> thread_results(num_threads);
@@ -223,6 +240,7 @@ vector<MatchResult> MatcherBase::findMatches(const std::string &query,
         ref(query_case),
         ref(matchOptions),
         use_last_match,
+        &min_score,
         max_results,
         ref(candidates_),
         cur_start,

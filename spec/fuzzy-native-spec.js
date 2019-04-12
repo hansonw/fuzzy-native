@@ -200,12 +200,34 @@ describe('fuzzy-native', function() {
     expect(values(result)).toEqual(['def']);
   });
 
+  it('applies a variable gap penalty', function() {
+    const CANDIDATE = 'abcdefghijk/test'
+    matcher.setCandidates([CANDIDATE]);
+    // Gap penalty caps out at 0.2.
+    let query = 'a/test';
+    expect(matcher.match(query)[0].score)
+      .toBeCloseTo(0.20 * query.length / CANDIDATE.length);
+    query = 'ab/test';
+    expect(matcher.match(query)[0].score)
+      .toBeCloseTo(0.20 * query.length / CANDIDATE.length);
+    // And then decreases by 0.05.
+    query = 'abc/test';
+    expect(matcher.match(query)[0].score)
+      .toBeCloseTo(0.25 * query.length / CANDIDATE.length);
+    query = 'abcdefghij/test';
+    expect(matcher.match(query)[0].score)
+      .toBeCloseTo(0.6 * query.length / CANDIDATE.length);
+    query = 'abcdefghijk/test';
+    expect(matcher.match(query)[0].score)
+      .toBe(1);
+  });
+
   it('supports large strings', function() {
     var longString = '';
     var indexes = [];
-    for (var i = 0; i < 1000; i++) {
-      longString += 'a';
-      indexes.push(i);
+    for (var i = 0; i < 500; i++) {
+      longString += 'ab';
+      indexes.push(i * 2, i * 2 + 1);
     }
     matcher.addCandidates([longString]);
     expect(matcher.match(longString, {recordMatchIndexes: true})).toEqual([{
@@ -213,6 +235,11 @@ describe('fuzzy-native', function() {
       value: longString,
       matchIndexes: indexes,
     }]);
+
+    // Despite exceeding the scoring threshold, make sure penalties are applied.
+    const matches = matcher.match('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
+    expect(matches.length).toBe(1);
+    expect(matches[0].score).toBeLessThan(1e-6);
   });
 
   it('works with non-alpha characters', function() {

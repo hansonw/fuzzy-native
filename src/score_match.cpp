@@ -10,6 +10,11 @@
 #include <string>
 #include <cstring>
 
+// memrchr is a non-standard extension only available in glibc.
+#if defined(__APPLE__) || defined(_WIN32) || defined(_WIN64)
+#include "memrchr.h"
+#endif
+
 using namespace std;
 
 // Initial multiplier when a gap is used.
@@ -112,7 +117,7 @@ float recursive_match(const MatchInfo &m,
           char_score = max(
             MIN_DISTANCE_PENALTY,
             BASE_DISTANCE_PENALTY -
-              (haystack_idx - j - 2) * ADDITIONAL_DISTANCE_PENALTY
+              (j - haystack_idx - 1) * ADDITIONAL_DISTANCE_PENALTY
           );
         }
       }
@@ -191,15 +196,14 @@ float score_match(const char *haystack,
   // Check if the needle exists in the haystack at all.
   // Simultaneously, we can figure out the last possible match for each needle
   // character (which prunes the search space by a ton)
-  int hindex = m.haystack_len - 1;
+  int hindex = m.haystack_len;
   for (int i = m.needle_len - 1; i >= 0; i--) {
-    while (hindex >= 0 && m.haystack_case[hindex] != m.needle_case[i]) {
-      hindex--;
-    }
-    if (hindex < 0) {
+    char* ptr = (char*)memrchr(m.haystack_case, m.needle_case[i], hindex);
+    if (ptr == nullptr) {
       return 0;
     }
-    last_match[i] = hindex--;
+    hindex = ptr - m.haystack_case;
+    last_match[i] = hindex;
   }
 
   m.haystack = haystack;
@@ -209,14 +213,17 @@ float score_match(const char *haystack,
   if (memo_size >= MAX_MEMO_SIZE) {
     // Just return the initial match.
     float penalty = 1.0;
-    if (match_indexes != nullptr) {
-      match_indexes->resize(m.needle_len);
-      for (size_t i = 0; i < m.needle_len; i++) {
-        match_indexes->at(i) = last_match[i];
-        if (i && last_match[i] != last_match[i - 1] + 1) {
-          penalty *= BASE_DISTANCE_PENALTY;
-        }
+    for (size_t i = 1; i < m.needle_len; i++) {
+      int gap = last_match[i] - last_match[i - 1];
+      if (gap > 1) {
+        penalty *= max(
+          MIN_DISTANCE_PENALTY,
+          BASE_DISTANCE_PENALTY - (gap - 1) * ADDITIONAL_DISTANCE_PENALTY
+        );
       }
+    }
+    if (match_indexes != nullptr) {
+      *match_indexes = vector<int>(last_match, last_match + m.needle_len);
     }
     return penalty * m.needle_len / m.haystack_len;
   }

@@ -50,12 +50,15 @@ public:
     std::string lowercase;
     int num_dirs;
     /**
-     * A bitmask of the letters (a-z) contained in the string.
-     * ('a' = 1, 'b' = 2, 'c' = 4, ...)
-     * We can then compute the bitmask of the query and very quickly prune out
-     * non-matches in many practical cases.
+     * A bitmask representing the counts of letters a-z contained in the string.
+     * Bits i*2 and i*2 + 1 represent a count of the i-th letter:
+     * 00 = 0
+     * 01 = 1
+     * 11 = 2
+     * With this scheme, if (bitmask(X) & bitmask(Y)) == bitmask(X) then we
+     * instantly know that Y contains at least all the letters in X.
      */
-    int bitmask;
+    uint64_t bitmask;
     /**
      * True if this was a match against lastQuery_.
      * Since the most common use case for this library is for typeaheads,

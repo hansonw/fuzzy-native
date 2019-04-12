@@ -14,6 +14,12 @@ inline int letter_bitmask(const char *str) {
   for (int i = 0; str[i]; i++) {
     if (str[i] >= 'a' && str[i] <= 'z') {
       result |= (1 << (str[i] - 'a'));
+    } else if (str[i] == '-') {
+      result |= (1 << 26);
+    } else if (str[i] == '_') {
+      result |= (1 << 27);
+    } else if (str[i] >= '0' && str[i] <= '3') {
+      result |= (1U << (28 + str[i] - '0'));
     }
   }
   return result;
@@ -29,13 +35,58 @@ inline string str_to_lower(const std::string &s) {
   return lower;
 }
 
+bool is_slash(char c) {
+  return c == '/' || c == '\\';
+}
+
+int num_dirs(const std::string &path) {
+  int num = 0;
+  for (size_t i = 0; i < path.length(); i++) {
+    if (is_slash(path[i])) {
+      num++;
+    }
+  }
+  return num;
+}
+
+int score_based_root_path(const MatchOptions &options,
+                          const MatcherBase::CandidateData &candidate) {
+  const std::string &root = options.root_path;
+  if (root.length() == 0) {
+    return 0;
+  }
+
+  const std::string &value = candidate.value;
+
+  size_t num_common_dirs = 0;
+  size_t i = 0;
+
+  // Count number of common directories
+  for (; i < root.length() && i < value.length(); i++) {
+    if (root[i] != value[i]) {
+      break;
+    }
+    if (is_slash(root[i])) {
+      num_common_dirs++;
+    }
+  }
+
+  if (i == root.length() && i < value.length() && is_slash(value[i])) {
+    num_common_dirs++;
+  }
+
+  return 1000 * num_common_dirs - candidate.num_dirs;
+}
+
 // Push a new entry on the heap while ensuring size <= max_results.
 void push_heap(ResultHeap &heap,
                float score,
+               int score_based_root_path,
                const std::string *value,
                size_t max_results) {
-  if (heap.size() < max_results || score > heap.top().score) {
-    heap.emplace(score, value);
+  MatchResult result(score, score_based_root_path, value);
+  if (heap.size() < max_results || result < heap.top()) {
+    heap.push(std::move(result));
     if (heap.size() > max_results) {
       heap.pop();
     }
@@ -59,6 +110,7 @@ vector<MatchResult> finalize(const string &query,
         query.c_str(),
         query_case.c_str(),
         options,
+        0.0,
         result.matchIndexes.get()
       );
     }
@@ -73,25 +125,43 @@ void thread_worker(
   const string &query,
   const string &query_case,
   const MatchOptions &options,
+  bool use_last_match,
   size_t max_results,
-  const vector<MatcherBase::CandidateData> &candidates,
+  vector<MatcherBase::CandidateData> &candidates,
   size_t start,
   size_t end,
   ResultHeap &result
 ) {
   int bitmask = letter_bitmask(query_case.c_str());
+  float min_score = 0.0;
   for (size_t i = start; i < end; i++) {
-    const auto &candidate = candidates[i];
+    auto &candidate = candidates[i];
+    if (use_last_match && !candidate.last_match) {
+      continue;
+    }
     if ((bitmask & candidate.bitmask) == bitmask) {
       float score = score_match(
         candidate.value.c_str(),
         candidate.lowercase.c_str(),
         query.c_str(),
         query_case.c_str(),
-        options
+        options,
+        min_score
       );
       if (score > 0) {
-        push_heap(result, score, &candidate.value, max_results);
+        push_heap(
+          result,
+          score,
+          score_based_root_path(options, candidate),
+          &candidate.value,
+          max_results
+        );
+        if (result.size() == max_results) {
+          min_score = max(min_score, result.top().score);
+        }
+        candidate.last_match = true;
+      } else {
+        candidate.last_match = false;
       }
     }
   }
@@ -108,6 +178,7 @@ vector<MatchResult> MatcherBase::findMatches(const std::string &query,
   matchOptions.case_sensitive = options.case_sensitive;
   matchOptions.smart_case = false;
   matchOptions.max_gap = options.max_gap;
+  matchOptions.root_path = options.root_path;
 
   string new_query;
   // Ignore all whitespace in the query.
@@ -115,7 +186,7 @@ vector<MatchResult> MatcherBase::findMatches(const std::string &query,
     if (!isspace(c)) {
       new_query += c;
     }
-    if (isupper(c) && !matchOptions.case_sensitive) {
+    if (options.smart_case && isupper(c) && !matchOptions.case_sensitive) {
       matchOptions.smart_case = true;
     }
   }
@@ -127,10 +198,15 @@ vector<MatchResult> MatcherBase::findMatches(const std::string &query,
     query_case = query;
   }
 
+  // If our current query is just an extension of the last query,
+  // quickly ignore all previous non-matches as an optimization.
+  bool use_last_match = query_case.substr(0, lastQuery_.size()) == lastQuery_;
+  lastQuery_ = query_case;
+
   ResultHeap combined;
   if (num_threads == 0 || candidates_.size() < 10000) {
-    thread_worker(new_query, query_case, matchOptions, max_results,
-                  candidates_, 0, candidates_.size(), combined);
+    thread_worker(new_query, query_case, matchOptions, use_last_match,
+                  max_results, candidates_, 0, candidates_.size(), combined);
   } else {
     vector<ResultHeap> thread_results(num_threads);
     vector<thread> threads;
@@ -146,6 +222,7 @@ vector<MatchResult> MatcherBase::findMatches(const std::string &query,
         ref(new_query),
         ref(query_case),
         ref(matchOptions),
+        use_last_match,
         max_results,
         ref(candidates_),
         cur_start,
@@ -159,7 +236,13 @@ vector<MatchResult> MatcherBase::findMatches(const std::string &query,
       threads[i].join();
       while (thread_results[i].size()) {
         auto &top = thread_results[i].top();
-        push_heap(combined, top.score, top.value, max_results);
+        push_heap(
+          combined,
+          top.score,
+          top.score_based_root_path,
+          top.value,
+          max_results
+        );
         thread_results[i].pop();
       }
     }
@@ -183,6 +266,8 @@ void MatcherBase::addCandidate(const string &candidate) {
     data.value = candidate;
     data.bitmask = letter_bitmask(lowercase.c_str());
     data.lowercase = move(lowercase);
+    data.last_match = true;
+    data.num_dirs = num_dirs(candidate);
     candidates_.emplace_back(move(data));
   }
 }

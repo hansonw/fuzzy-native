@@ -54,11 +54,11 @@ describe('fuzzy-native', function() {
     ]);
 
     // Defaults to case-insensitive matching (favouring the right case).
-    result = matcher.match('ABC');
+    result = matcher.match('ABC', {smartCase: true});
     expect(values(result)).toEqual([
+      'AlphaBetaCappa',
       'abC',
       'abcd',
-      'AlphaBetaCappa',
       'alphabetacappa',
     ]);
 
@@ -89,7 +89,7 @@ describe('fuzzy-native', function() {
   });
 
   it('uses smart case', function() {
-    var result = matcher.match('ThisIsATestDir');
+    var result = matcher.match('ThisIsATestDir', {smartCase: true});
     expect(values(result)).toEqual([
       '/////ThisIsATestDir',
       'thisisatestdir',
@@ -129,10 +129,28 @@ describe('fuzzy-native', function() {
     ]);
   });
 
-  it('breaks ties by length', function() {
+  it('breaks ties by length if root folder is not passed', function() {
     matcher.setCandidates(['123/a', '12/a', '1/a']);
     var result = matcher.match('a');
     expect(values(result)).toEqual(['1/a', '12/a', '123/a']);
+  });
+
+  it('breaks ties by distance to root folder', function() {
+    matcher.setCandidates([
+      '/A/B/C/file.js',
+      '/A/B/file.js',
+      '/A/C/D/file.js',
+      '/A/REALLY_BIG_NAME/file.js',
+      '/A/file.js',
+    ]);
+    var result = matcher.match('file', {rootPath: '/A/B/C/'});
+    expect(values(result)).toEqual([
+      '/A/B/C/file.js',
+      '/A/B/file.js',
+      '/A/file.js',
+      '/A/REALLY_BIG_NAME/file.js',
+      '/A/C/D/file.js',
+    ]);
   });
 
   it('can limit to maxResults', function() {
@@ -141,10 +159,10 @@ describe('fuzzy-native', function() {
       'abC',
     ]);
 
-    result = matcher.match('ABC', {maxResults: 2});
+    result = matcher.match('ABC', {maxResults: 2, smartCase: true});
     expect(values(result)).toEqual([
+      'AlphaBetaCappa',
       'abC',
-      'abcd',
     ]);
   });
 
@@ -155,7 +173,7 @@ describe('fuzzy-native', function() {
     // alphabetacappa
     // _    _   _
     expect(result[2].matchIndexes).toEqual([0, 5, 9]);
-    expect(result[3].matchIndexes).toEqual([0, 5, 9]);
+    expect(result[3].matchIndexes).toEqual([4, 5, 9]);
 
     result = matcher.match('t/i/a/t/d', {recordMatchIndexes: true});
     // /this/is/a/test/dir',
@@ -195,5 +213,10 @@ describe('fuzzy-native', function() {
       value: longString,
       matchIndexes: indexes,
     }]);
+  });
+
+  it('works with non-alpha characters', function() {
+    matcher.addCandidates(['-_01234', '01234-']);
+    expect(values(matcher.match('-034'))).toEqual(['-_01234']);
   });
 });

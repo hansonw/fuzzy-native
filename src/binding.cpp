@@ -35,6 +35,27 @@ std::string to_std_string(const v8::Local<v8::String> &v8str) {
   return str;
 }
 
+std::string get_string_property(const v8::Local<v8::Object> &object,
+                                const char *name) {
+  auto prop =
+    Nan::Get(object, Nan::New(name).ToLocalChecked());
+  if (!prop.IsEmpty()) {
+    auto propLocal = prop.ToLocalChecked();
+    if (propLocal->IsNull() || propLocal->IsUndefined()) {
+      return std::string("");
+    }
+    if (!propLocal->IsString()) {
+      std::string msg =
+        std::string("property ") +
+        name +
+        std::string(" must be a string");
+      ThrowTypeError(msg.c_str());
+    }
+    return to_std_string(propLocal->ToString());
+  }
+  return std::string("");
+}
+
 Persistent<v8::Function> MatcherConstructor;
 
 class Matcher : public ObjectWrap {
@@ -78,11 +99,13 @@ public:
       CHECK(info[1]->IsObject(), "Second argument should be an options object");
       auto options_obj = info[1]->ToObject();
       options.case_sensitive = get_property<bool>(options_obj, "caseSensitive");
+      options.smart_case = get_property<bool>(options_obj, "smartCase");
       options.num_threads = get_property<int>(options_obj, "numThreads");
       options.max_results = get_property<int>(options_obj, "maxResults");
       options.max_gap = get_property<int>(options_obj, "maxGap");
       options.record_match_indexes =
           get_property<bool>(options_obj, "recordMatchIndexes");
+      options.root_path = get_string_property(options_obj, "rootPath");
     }
 
     auto valueKey = New("value").ToLocalChecked();
@@ -115,8 +138,16 @@ public:
     if (info.Length() > 0) {
       CHECK(info[0]->IsArray(), "Expected an array of strings");
       auto arg1 = v8::Local<v8::Array>::Cast(info[0]);
+      // Create a random permutation so that candidates are shuffled.
+      std::vector<size_t> indexes(arg1->Length());
+      for (size_t i = 0; i < indexes.size(); i++) {
+        indexes[i] = i;
+        if (i > 0) {
+          std::swap(indexes[rand() % i], indexes[i]);
+        }
+      }
       matcher->impl_.reserve(matcher->impl_.size() + arg1->Length());
-      for (size_t i = 0; i < arg1->Length(); i++) {
+      for (auto i: indexes) {
         matcher->impl_.addCandidate(to_std_string(arg1->Get(i)->ToString()));
       }
     }

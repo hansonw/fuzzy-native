@@ -1,12 +1,14 @@
 #pragma once
 
 #include <cstddef>
+#include <string>
 #include <vector>
 
 struct MatchOptions {
   bool case_sensitive;
   bool smart_case;
   size_t max_gap;
+  std::string root_path;
 };
 
 /**
@@ -25,4 +27,5 @@ float score_match(const char *haystack,
                   const char *needle,
                   const char *needle_lower,
                   const MatchOptions &options,
+                  const float min_score,
                   std::vector<int> *match_indexes = nullptr);

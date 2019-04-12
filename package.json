@@ -1,14 +1,13 @@
 {
-  "name": "fuzzy-native",
-  "version": "0.6.6",
+  "name": "@atom/fuzzy-native",
+  "version": "0.7.0",
   "description": "Native C++ implementation of a fuzzy string matcher.",
   "main": "lib/main.js",
   "scripts": {
     "test": "jasmine-node --captureExceptions spec",
     "build": "node-pre-gyp configure build",
     "rebuild": "node-pre-gyp rebuild",
-    "install": "node-pre-gyp install --fallback-to-build",
-    "prepublish": "node tools/prepublish.js"
+    "install": "node-pre-gyp install --fallback-to-build"
   },
   "files": [
     "binding.gyp",
@@ -23,7 +22,7 @@
     "string"
   ],
   "author": "Hanson Wang (hanson.wng@gmail.com)",
-  "repository": "https://github.com/hansonw/fuzzy-native",
+  "repository": "https://github.com/atom/fuzzy-native",
   "license": "MIT",
   "dependencies": {
     "nan": "^2.0.0",
@@ -41,7 +40,7 @@
     "module_name": "fuzzy-native",
     "module_path": "./build/{module_name}/v{version}/{node_abi}-{platform}-{arch}/",
     "host": "https://github.com/",
-    "remote_path": "./hansonw/{module_name}/releases/download/v{version}/",
+    "remote_path": "./atom/{module_name}/releases/download/v{version}/",
     "package_name": "{node_abi}-{platform}-{arch}.tar.gz"
   }
 }

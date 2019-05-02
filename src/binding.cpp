@@ -108,6 +108,7 @@ public:
       options.root_path = get_string_property(options_obj, "rootPath");
     }
 
+    auto idKey = New("id").ToLocalChecked();
     auto valueKey = New("value").ToLocalChecked();
     auto scoreKey = New("score").ToLocalChecked();
     auto matchIndexesKey = New("matchIndexes").ToLocalChecked();
@@ -119,6 +120,7 @@ public:
     size_t result_count = 0;
     for (const auto &match : matches) {
       auto obj = New<v8::Object>();
+      Set(obj, idKey, New<v8::Uint32>(match.id));
       Set(obj, scoreKey, New(match.score));
       Set(obj, valueKey, New(*match.value).ToLocalChecked());
       if (match.matchIndexes != nullptr) {
@@ -136,19 +138,29 @@ public:
   static void AddCandidates(const FunctionCallbackInfo<v8::Value> &info) {
     auto matcher = Unwrap<Matcher>(info.This());
     if (info.Length() > 0) {
-      CHECK(info[0]->IsArray(), "Expected an array of strings");
-      auto arg1 = v8::Local<v8::Array>::Cast(info[0]);
+      CHECK(info[0]->IsArray(), "Expected an array of unsigned 32-bit integer ids as the first argument");
+      CHECK(info[1]->IsArray(), "Expected an array of strings as the second argument");
+
+      auto ids = v8::Local<v8::Array>::Cast(info[0]);
+      auto values = v8::Local<v8::Array>::Cast(info[1]);
+
+      CHECK(ids->Length() == values->Length(), "Expected ids array and values array to have the same length");
+
       // Create a random permutation so that candidates are shuffled.
-      std::vector<size_t> indexes(arg1->Length());
+      std::vector<size_t> indexes(ids->Length());
       for (size_t i = 0; i < indexes.size(); i++) {
         indexes[i] = i;
         if (i > 0) {
           std::swap(indexes[rand() % i], indexes[i]);
         }
       }
-      matcher->impl_.reserve(matcher->impl_.size() + arg1->Length());
+      matcher->impl_.reserve(matcher->impl_.size() + ids->Length());
       for (auto i: indexes) {
-        matcher->impl_.addCandidate(to_std_string(arg1->Get(i)->ToString()));
+        auto id_value = ids->Get(i);
+        CHECK(id_value->IsUint32(), "Expected first array to only contain unsigned 32-bit integer ids");
+        auto id = v8::Local<v8::Uint32>::Cast(id_value)->Value();
+        auto value = to_std_string(values->Get(i)->ToString());
+        matcher->impl_.addCandidate(id, value);
       }
     }
   }
@@ -156,10 +168,13 @@ public:
   static void RemoveCandidates(const FunctionCallbackInfo<v8::Value> &info) {
     auto matcher = Unwrap<Matcher>(info.This());
     if (info.Length() > 0) {
-      CHECK(info[0]->IsArray(), "Expected an array of strings");
-      auto arg1 = v8::Local<v8::Array>::Cast(info[0]);
-      for (size_t i = 0; i < arg1->Length(); i++) {
-        matcher->impl_.removeCandidate(to_std_string(arg1->Get(i)->ToString()));
+      CHECK(info[0]->IsArray(), "Expected an array of unsigned 32-bit integer ids");
+      auto ids = v8::Local<v8::Array>::Cast(info[0]);
+      for (size_t i = 0; i < ids->Length(); i++) {
+        auto id_value = ids->Get(i);
+        CHECK(id_value->IsUint32(), "Expected array to only contain unsigned 32-bit integer ids");
+        auto id = v8::Local<v8::Uint32>::Cast(id_value)->Value();
+        matcher->impl_.removeCandidate(id);
       }
     }
   }

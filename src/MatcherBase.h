@@ -17,6 +17,7 @@ struct MatcherOptions {
 
 struct MatchResult {
   float score;
+  uint32_t id;
   // We can't afford to copy strings around while we're ranking them.
   // These are not guaranteed to last very long and should be copied out ASAP.
   const std::string *value;
@@ -26,8 +27,12 @@ struct MatchResult {
 
   MatchResult(float score,
               int score_based_root_path,
+              uint32_t id,
               const std::string *value)
-    : score(score), value(value), score_based_root_path(score_based_root_path) {}
+    : score(score),
+      id(id),
+      value(value),
+      score_based_root_path(score_based_root_path) {}
 
   // Order small scores to the top of any priority queue.
   // We need a min-heap to maintain the top-N results.
@@ -46,6 +51,7 @@ struct MatchResult {
 class MatcherBase {
 public:
   struct CandidateData {
+    uint32_t id;
     std::string value;
     std::string lowercase;
     int num_dirs;
@@ -70,8 +76,8 @@ public:
 
   std::vector<MatchResult> findMatches(const std::string &query,
                                        const MatcherOptions &options);
-  void addCandidate(const std::string &candidate);
-  void removeCandidate(const std::string &candidate);
+  void addCandidate(uint32_t id, const std::string &candidate);
+  void removeCandidate(uint32_t id);
   void clear();
   void reserve(size_t n);
   size_t size() const;
@@ -81,6 +87,6 @@ private:
   // This makes add/remove slightly more expensive, but in our case queries
   // are significantly more frequent.
   std::vector<CandidateData> candidates_;
-  std::unordered_map<std::string, size_t> lookup_;
+  std::unordered_map<uint32_t, size_t> lookup_;
   std::string lastQuery_;
 };

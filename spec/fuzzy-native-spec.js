@@ -8,10 +8,14 @@ function values(results) {
   });
 }
 
+function genIds(values) {
+  return [Array.from({length: values.length}, (_, i) => i), values];
+}
+
 describe('fuzzy-native', function() {
   var matcher;
   beforeEach(function() {
-    matcher = new fuzzyNative.Matcher([
+    const paths = [
       '',
       'a',
       'ab',
@@ -27,7 +31,9 @@ describe('fuzzy-native', function() {
       '/path1/zzz/path3/path4',
       '/path1/path2/zzz/path4',
       '/path1/path2/path3/zzz',
-    ]);
+    ];
+
+    matcher = new fuzzyNative.Matcher(...genIds(paths));
   });
 
   it('can match strings', function() {
@@ -116,11 +122,11 @@ describe('fuzzy-native', function() {
   });
 
   it('prefers whole words', function() {
-    matcher.setCandidates([
+    matcher.setCandidates(...genIds([
       'testa',
       'testA',
       'tes/A',
-    ]);
+    ]));
     var result = matcher.match('a');
     expect(values(result)).toEqual([
       'tes/A',
@@ -130,19 +136,19 @@ describe('fuzzy-native', function() {
   });
 
   it('breaks ties by length if root folder is not passed', function() {
-    matcher.setCandidates(['123/a', '12/a', '1/a']);
+    matcher.setCandidates(...genIds(['123/a', '12/a', '1/a']));
     var result = matcher.match('a');
     expect(values(result)).toEqual(['1/a', '12/a', '123/a']);
   });
 
   it('breaks ties by distance to root folder', function() {
-    matcher.setCandidates([
+    matcher.setCandidates(...genIds([
       '/A/B/C/file.js',
       '/A/B/file.js',
       '/A/C/D/file.js',
       '/A/REALLY_BIG_NAME/file.js',
       '/A/file.js',
-    ]);
+    ]));
     var result = matcher.match('file', {rootPath: '/A/B/C/'});
     expect(values(result)).toEqual([
       '/A/B/C/file.js',
@@ -187,11 +193,11 @@ describe('fuzzy-native', function() {
       'abC',
     ]);
 
-    matcher.setCandidates([]);
+    matcher.setCandidates([], []);
     result = matcher.match('abc');
     expect(values(result)).toEqual([]);
 
-    matcher.addCandidates(['abc', 'def']);
+    matcher.addCandidates(...genIds(['abc', 'def']));
     result = matcher.match('abc');
     expect(values(result)).toEqual(['abc']);
 
@@ -202,7 +208,7 @@ describe('fuzzy-native', function() {
 
   it('applies a variable gap penalty', function() {
     const CANDIDATE = 'abcdefghijk/test'
-    matcher.setCandidates([CANDIDATE]);
+    matcher.setCandidates([0], [CANDIDATE]);
     // Gap penalty caps out at 0.2.
     let query = 'a/test';
     expect(matcher.match(query)[0].score)
@@ -229,7 +235,7 @@ describe('fuzzy-native', function() {
       longString += 'ab';
       indexes.push(i * 2, i * 2 + 1);
     }
-    matcher.addCandidates([longString]);
+    matcher.addCandidates([0], [longString]);
     expect(matcher.match(longString, {recordMatchIndexes: true})).toEqual([{
       score: 1,
       value: longString,
@@ -243,7 +249,7 @@ describe('fuzzy-native', function() {
   });
 
   it('works with non-alpha characters', function() {
-    matcher.addCandidates(['-_01234', '01234-']);
+    matcher.addCandidates([0, 1], ['-_01234', '01234-']);
     expect(values(matcher.match('-034'))).toEqual(['-_01234']);
   });
 });

@@ -25,11 +25,13 @@ function shuffle(array) {
 
 describe('fuzzy-native', function() {
   it('works on large inputs', () => {
+    var ids = [];
     var candidates = [];
     for (var i = 0; i < N; i++) {
+      ids[i] = i;
       candidates.push(randomString());
     }
-    var matcher = new fuzzyNative.Matcher(candidates);
+    var matcher = new fuzzyNative.Matcher(ids, candidates);
 
     // Match indexes should be 0..STRING_LEN - 1.
     var indexes = [];

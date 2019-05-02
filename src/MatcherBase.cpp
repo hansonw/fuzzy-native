@@ -275,12 +275,13 @@ vector<MatchResult> MatcherBase::findMatches(const std::string &query,
   );
 }
 
-void MatcherBase::addCandidate(const string &candidate) {
+void MatcherBase::addCandidate(uint32_t id, const string &candidate) {
   auto it = lookup_.find(candidate);
   if (it == lookup_.end()) {
     string lowercase = str_to_lower(candidate);
     lookup_[candidate] = candidates_.size();
     CandidateData data;
+    data.id = id;
     data.value = candidate;
     data.bitmask = letter_bitmask(lowercase.c_str());
     data.lowercase = move(lowercase);

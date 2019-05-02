@@ -46,6 +46,7 @@ struct MatchResult {
 class MatcherBase {
 public:
   struct CandidateData {
+    uint32_t id;
     std::string value;
     std::string lowercase;
     int num_dirs;
@@ -70,7 +71,7 @@ public:
 
   std::vector<MatchResult> findMatches(const std::string &query,
                                        const MatcherOptions &options);
-  void addCandidate(const std::string &candidate);
+  void addCandidate(uint32_t id, const std::string &candidate);
   void removeCandidate(const std::string &candidate);
   void clear();
   void reserve(size_t n);

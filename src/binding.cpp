@@ -136,19 +136,26 @@ public:
   static void AddCandidates(const FunctionCallbackInfo<v8::Value> &info) {
     auto matcher = Unwrap<Matcher>(info.This());
     if (info.Length() > 0) {
-      CHECK(info[0]->IsArray(), "Expected an array of strings");
-      auto arg1 = v8::Local<v8::Array>::Cast(info[0]);
+      CHECK(info[0]->IsArray(), "Expected an array of unsigned 32-bit integer ids as the first argument");
+      CHECK(info[1]->IsArray(), "Expected an array of strings as the second argument");
+
+      auto ids = v8::Local<v8::Array>::Cast(info[0]);
+      auto values = v8::Local<v8::Array>::Cast(info[1]);
       // Create a random permutation so that candidates are shuffled.
-      std::vector<size_t> indexes(arg1->Length());
+      std::vector<size_t> indexes(ids->Length());
       for (size_t i = 0; i < indexes.size(); i++) {
         indexes[i] = i;
         if (i > 0) {
           std::swap(indexes[rand() % i], indexes[i]);
         }
       }
-      matcher->impl_.reserve(matcher->impl_.size() + arg1->Length());
+      matcher->impl_.reserve(matcher->impl_.size() + ids->Length());
       for (auto i: indexes) {
-        matcher->impl_.addCandidate(to_std_string(arg1->Get(i)->ToString()));
+        auto id_value = ids->Get(i);
+        CHECK(id_value->IsUint32(), "Expected first array to only contain unsigned 32-bit integer ids");
+        auto id = v8::Local<v8::Uint32>::Cast(id_value)->Value();
+        auto value = to_std_string(values->Get(i)->ToString());
+        matcher->impl_.addCandidate(id, value);
       }
     }
   }

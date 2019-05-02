@@ -1,6 +1,6 @@
 {
   "name": "@atom/fuzzy-native",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Native C++ implementation of a fuzzy string matcher.",
   "main": "lib/main.js",
   "scripts": {

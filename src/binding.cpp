@@ -168,10 +168,13 @@ public:
   static void RemoveCandidates(const FunctionCallbackInfo<v8::Value> &info) {
     auto matcher = Unwrap<Matcher>(info.This());
     if (info.Length() > 0) {
-      CHECK(info[0]->IsArray(), "Expected an array of strings");
-      auto arg1 = v8::Local<v8::Array>::Cast(info[0]);
-      for (size_t i = 0; i < arg1->Length(); i++) {
-        matcher->impl_.removeCandidate(to_std_string(arg1->Get(i)->ToString()));
+      CHECK(info[0]->IsArray(), "Expected an array of unsigned 32-bit integer ids");
+      auto ids = v8::Local<v8::Array>::Cast(info[0]);
+      for (size_t i = 0; i < ids->Length(); i++) {
+        auto id_value = ids->Get(i);
+        CHECK(id_value->IsUint32(), "Expected array to only contain unsigned 32-bit integer ids");
+        auto id = v8::Local<v8::Uint32>::Cast(id_value)->Value();
+        matcher->impl_.removeCandidate(id);
       }
     }
   }

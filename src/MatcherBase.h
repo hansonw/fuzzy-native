@@ -77,7 +77,7 @@ public:
   std::vector<MatchResult> findMatches(const std::string &query,
                                        const MatcherOptions &options);
   void addCandidate(uint32_t id, const std::string &candidate);
-  void removeCandidate(const std::string &candidate);
+  void removeCandidate(uint32_t id);
   void clear();
   void reserve(size_t n);
   size_t size() const;
@@ -87,6 +87,6 @@ private:
   // This makes add/remove slightly more expensive, but in our case queries
   // are significantly more frequent.
   std::vector<CandidateData> candidates_;
-  std::unordered_map<std::string, size_t> lookup_;
+  std::unordered_map<uint32_t, size_t> lookup_;
   std::string lastQuery_;
 };

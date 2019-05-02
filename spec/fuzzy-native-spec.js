@@ -197,11 +197,11 @@ describe('fuzzy-native', function() {
     result = matcher.match('abc');
     expect(values(result)).toEqual([]);
 
-    matcher.addCandidates(...genIds(['abc', 'def']));
+    matcher.addCandidates([0, 1], ['abc', 'def']);
     result = matcher.match('abc');
     expect(values(result)).toEqual(['abc']);
 
-    matcher.removeCandidates(['abc']);
+    matcher.removeCandidates([0]);
     result = matcher.match('');
     expect(values(result)).toEqual(['def']);
   });
@@ -235,7 +235,7 @@ describe('fuzzy-native', function() {
       longString += 'ab';
       indexes.push(i * 2, i * 2 + 1);
     }
-    matcher.addCandidates([0], [longString]);
+    matcher.setCandidates([0], [longString]);
     expect(matcher.match(longString, {recordMatchIndexes: true})).toEqual([{
       score: 1,
       id: 0,
@@ -250,7 +250,7 @@ describe('fuzzy-native', function() {
   });
 
   it('works with non-alpha characters', function() {
-    matcher.addCandidates([0, 1], ['-_01234', '01234-']);
+    matcher.setCandidates([0, 1], ['-_01234', '01234-']);
     expect(values(matcher.match('-034'))).toEqual(['-_01234']);
   });
 
@@ -258,5 +258,12 @@ describe('fuzzy-native', function() {
     const expectedMessage = 'Expected ids array and values array to have the same length';
     expect(() => matcher.addCandidates([1, 2, 3], ["a", "b"])).toThrow(expectedMessage)
     expect(() => matcher.addCandidates([1, 2], ["a", "b", "c"])).toThrow(expectedMessage)
+  });
+
+  it('returns match results for duplicate values with different ids', () => {
+    matcher.setCandidates([0, 1], ['abc', 'abc']);
+    expect(matcher.match('ac').length).toBe(2);
+    matcher.setCandidates([0, 0], ['abc', 'abc']);
+    expect(matcher.match('ac').length).toBe(1);
   })
 });

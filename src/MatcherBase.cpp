@@ -279,10 +279,10 @@ vector<MatchResult> MatcherBase::findMatches(const std::string &query,
 }
 
 void MatcherBase::addCandidate(uint32_t id, const string &candidate) {
-  auto it = lookup_.find(candidate);
+  auto it = lookup_.find(id);
   if (it == lookup_.end()) {
     string lowercase = str_to_lower(candidate);
-    lookup_[candidate] = candidates_.size();
+    lookup_[id] = candidates_.size();
     CandidateData data;
     data.id = id;
     data.value = candidate;
@@ -294,15 +294,15 @@ void MatcherBase::addCandidate(uint32_t id, const string &candidate) {
   }
 }
 
-void MatcherBase::removeCandidate(const string &candidate) {
-  auto it = lookup_.find(candidate);
+void MatcherBase::removeCandidate(uint32_t id) {
+  auto it = lookup_.find(id);
   if (it != lookup_.end()) {
     if (it->second + 1 != candidates_.size()) {
       swap(candidates_[it->second], candidates_.back());
-      lookup_[candidates_[it->second].value] = it->second;
+      lookup_[candidates_[it->second].id] = it->second;
     }
     candidates_.pop_back();
-    lookup_.erase(candidate);
+    lookup_.erase(id);
   }
 }
 

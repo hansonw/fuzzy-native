@@ -27,9 +27,17 @@ describe('fuzzy-native', function() {
   it('works on large inputs', () => {
     var ids = [];
     var candidates = [];
+    var usedCandidates = new Set();
     for (var i = 0; i < N; i++) {
-      ids[i] = 0;
-      candidates.push(randomString());
+      ids[i] = i;
+      while (true) {
+        var candidate = randomString();
+        if (!usedCandidates.has(candidate)) {
+          usedCandidates.add(candidate);
+          candidates.push(candidate);
+          break;
+        }
+      }
     }
     var matcher = new fuzzyNative.Matcher(ids, candidates);
 
@@ -53,20 +61,21 @@ describe('fuzzy-native', function() {
         });
         expect(results).toEqual([{
           score: 1,
-          id: 0,
+          id: idx + start,
           value: candidates[idx + start],
           matchIndexes: indexes,
         }]);
       }
 
       // 2. Delete a large chunk of strings
-      var deleted = candidates.slice(start, start + chunkSize);
-      matcher.removeCandidates(deleted);
+      var deletedIds = ids.slice(start, start + chunkSize);
+      var deletedValues = candidates.slice(start, start + chunkSize);
+      matcher.removeCandidates(deletedIds);
 
       // 3. Make sure deleted strings no longer match.
       for (var j = 0; j < 10; j++) {
-        var idx = Math.floor(Math.random() * deleted.length);
-        var results = matcher.match(deleted[idx], {
+        var idx = Math.floor(Math.random() * deletedIds.length);
+        var results = matcher.match(deletedValues[idx], {
           maxResults: 10,
           numThreads: 4,
         });

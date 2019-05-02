@@ -31,6 +31,7 @@ export type MatcherOptions = {
 }
 
 export type MatchResult = {
+  id: number,
   value: string,
 
   // A number in the range (0-1]. Higher scores are more relevant.
@@ -49,9 +50,9 @@ export class Matcher {
   // Will be ordered by score, descending.
   match: (query: string, options?: MatcherOptions) => Array<MatchResult>;
 
-  addCandidates: (candidates: Array<string>) => void;
-  removeCandidates: (candidates: Array<string>) => void;
-  setCandidates: (candidates: Array<string>) => void;
+  addCandidates: (ids: Array<number>, candidates: Array<string>) => void;
+  removeCandidates: (ids: Array<number>) => void;
+  setCandidates: (ids: Array<number>, candidates: Array<string>) => void;
 }
 ```
 

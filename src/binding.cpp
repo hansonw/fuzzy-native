@@ -108,6 +108,7 @@ public:
       options.root_path = get_string_property(options_obj, "rootPath");
     }
 
+    auto idKey = New("id").ToLocalChecked();
     auto valueKey = New("value").ToLocalChecked();
     auto scoreKey = New("score").ToLocalChecked();
     auto matchIndexesKey = New("matchIndexes").ToLocalChecked();
@@ -119,6 +120,7 @@ public:
     size_t result_count = 0;
     for (const auto &match : matches) {
       auto obj = New<v8::Object>();
+      Set(obj, idKey, New<v8::Uint32>(match.id));
       Set(obj, scoreKey, New(match.score));
       Set(obj, valueKey, New(*match.value).ToLocalChecked());
       if (match.matchIndexes != nullptr) {
@@ -141,6 +143,9 @@ public:
 
       auto ids = v8::Local<v8::Array>::Cast(info[0]);
       auto values = v8::Local<v8::Array>::Cast(info[1]);
+
+      CHECK(ids->Length() == values->Length(), "Expected ids array and values array to have the same length");
+
       // Create a random permutation so that candidates are shuffled.
       std::vector<size_t> indexes(ids->Length());
       for (size_t i = 0; i < indexes.size(); i++) {

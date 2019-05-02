@@ -28,7 +28,7 @@ describe('fuzzy-native', function() {
     var ids = [];
     var candidates = [];
     for (var i = 0; i < N; i++) {
-      ids[i] = i;
+      ids[i] = 0;
       candidates.push(randomString());
     }
     var matcher = new fuzzyNative.Matcher(ids, candidates);
@@ -53,6 +53,7 @@ describe('fuzzy-native', function() {
         });
         expect(results).toEqual([{
           score: 1,
+          id: 0,
           value: candidates[idx + start],
           matchIndexes: indexes,
         }]);

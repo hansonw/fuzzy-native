@@ -90,9 +90,10 @@ int score_based_root_path(const MatchOptions &options,
 void push_heap(ResultHeap &heap,
                float score,
                int score_based_root_path,
+               uint32_t id,
                const std::string *value,
                size_t max_results) {
-  MatchResult result(score, score_based_root_path, value);
+  MatchResult result(score, score_based_root_path, id, value);
   if (heap.size() < max_results || result < heap.top()) {
     heap.push(std::move(result));
     if (heap.size() > max_results) {
@@ -161,6 +162,7 @@ void thread_worker(
           result,
           score,
           score_based_root_path(options, candidate),
+          candidate.id,
           &candidate.value,
           max_results
         );
@@ -258,6 +260,7 @@ vector<MatchResult> MatcherBase::findMatches(const std::string &query,
           combined,
           top.score,
           top.score_based_root_path,
+          top.id,
           top.value,
           max_results
         );

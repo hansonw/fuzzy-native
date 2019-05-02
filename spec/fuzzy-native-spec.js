@@ -238,6 +238,7 @@ describe('fuzzy-native', function() {
     matcher.addCandidates([0], [longString]);
     expect(matcher.match(longString, {recordMatchIndexes: true})).toEqual([{
       score: 1,
+      id: 0,
       value: longString,
       matchIndexes: indexes,
     }]);
@@ -252,4 +253,10 @@ describe('fuzzy-native', function() {
     matcher.addCandidates([0, 1], ['-_01234', '01234-']);
     expect(values(matcher.match('-034'))).toEqual(['-_01234']);
   });
+
+  it('ensures that the ids array and the values array are the same length when adding candidates', () => {
+    const expectedMessage = 'Expected ids array and values array to have the same length';
+    expect(() => matcher.addCandidates([1, 2, 3], ["a", "b"])).toThrow(expectedMessage)
+    expect(() => matcher.addCandidates([1, 2], ["a", "b", "c"])).toThrow(expectedMessage)
+  })
 });

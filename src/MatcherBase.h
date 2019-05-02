@@ -17,6 +17,7 @@ struct MatcherOptions {
 
 struct MatchResult {
   float score;
+  uint32_t id;
   // We can't afford to copy strings around while we're ranking them.
   // These are not guaranteed to last very long and should be copied out ASAP.
   const std::string *value;
@@ -26,8 +27,12 @@ struct MatchResult {
 
   MatchResult(float score,
               int score_based_root_path,
+              uint32_t id,
               const std::string *value)
-    : score(score), value(value), score_based_root_path(score_based_root_path) {}
+    : score(score),
+      id(id),
+      value(value),
+      score_based_root_path(score_based_root_path) {}
 
   // Order small scores to the top of any priority queue.
   // We need a min-heap to maintain the top-N results.

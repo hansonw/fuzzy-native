@@ -11,7 +11,6 @@
   },
   "files": [
     "binding.gyp",
-    "build/fuzzy-native",
     "lib",
     "src"
   ],

@@ -4,10 +4,7 @@
   "description": "Native C++ implementation of a fuzzy string matcher.",
   "main": "lib/main.js",
   "scripts": {
-    "test": "jasmine-node --captureExceptions spec",
-    "build": "node-pre-gyp configure build",
-    "rebuild": "node-pre-gyp rebuild",
-    "install": "node-pre-gyp install --fallback-to-build"
+    "test": "jasmine-node --captureExceptions spec"
   },
   "files": [
     "binding.gyp",
@@ -25,19 +22,10 @@
   "license": "MIT",
   "dependencies": {
     "nan": "^2.0.0",
-    "node-pre-gyp": "^0.10.0",
     "semver": "^5.0.0"
   },
-  "bundledDependencies": [
-    "node-pre-gyp"
-  ],
   "devDependencies": {
     "jasmine-node": "^1.14.5",
     "rimraf": "^2.5.2"
-  },
-  "binary": {
-    "module_name": "fuzzy-native",
-    "module_path": "./build/{module_name}/v{version}/",
-    "host": "https://github.com/"
   }
 }

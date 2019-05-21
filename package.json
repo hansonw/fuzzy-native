@@ -21,8 +21,7 @@
   "repository": "https://github.com/atom/fuzzy-native",
   "license": "MIT",
   "dependencies": {
-    "nan": "^2.0.0",
-    "semver": "^5.0.0"
+    "nan": "^2.0.0"
   },
   "devDependencies": {
     "jasmine-node": "^1.14.5",

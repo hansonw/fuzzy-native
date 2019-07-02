@@ -93,10 +93,12 @@ float recursive_match(const MatchInfo &m,
   size_t last_slash = 0;
   for (size_t j = haystack_idx; j <= lim; j++) {
     char d = m.haystack_case[j];
-    if (needle_idx == 0 && (d == '/' || d == '\\')) {
+    bool is_path_sep = d == '/' || d == '\\';
+
+    if (needle_idx == 0 && is_path_sep) {
       last_slash = j;
     }
-    if (c == d) {
+    if (c == d || (is_path_sep && (c == '_' || c == '\\'))) {
       // calculate score
       float char_score = 1.0;
       if (j > haystack_idx) {
@@ -123,8 +125,12 @@ float recursive_match(const MatchInfo &m,
       }
 
       // Apply a severe penalty if the case doesn't match.
-      // This should always hoist the exact case matches above all others.
-      if (m.smart_case && m.needle[needle_idx] != m.haystack[j]) {
+      // This will make the exact matches have higher score than the case
+      // insensitive and the path insensitive matches.
+      if (
+        (m.smart_case || m.haystack[j] == '/') &&
+        m.needle[needle_idx] != m.haystack[j]
+      ) {
         char_score *= 0.001;
       }
 
@@ -200,7 +206,15 @@ float score_match(const char *haystack,
   for (int i = m.needle_len - 1; i >= 0; i--) {
     char* ptr = (char*)memrchr(m.haystack_case, m.needle_case[i], hindex);
     if (ptr == nullptr) {
-      return 0;
+      // Since we treat _ and \\ as path separators, we need to re-check if path
+      // separator exists on the string in case they exact chars are not found.
+      if (m.needle_case[i] == '_' || m.needle_case[i] == '\\') {
+        ptr = (char*)memrchr(m.haystack_case, '/', hindex);
+      }
+
+      if (ptr == nullptr) {
+        return 0;
+      }
     }
     hindex = ptr - m.haystack_case;
     last_match[i] = hindex;

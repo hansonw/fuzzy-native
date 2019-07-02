@@ -265,5 +265,79 @@ describe('fuzzy-native', function() {
     expect(matcher.match('ac').length).toBe(2);
     matcher.setCandidates([0, 0], ['abc', 'abc']);
     expect(matcher.match('ac').length).toBe(1);
-  })
+  });
+
+  it('returns matches when using different path separators', () => {
+    expect(
+      values(matcher.match('path1_path2_path3_zzz', {caseSensitive: true}))
+    ).toEqual([
+      '/path1/path2/path3/zzz',
+    ]);
+    expect(
+      values(matcher.match('path1_path2_path3_zzz', {caseSensitive: false}))
+    ).toEqual([
+      '/path1/path2/path3/zzz',
+    ]);
+
+    expect(
+      values(matcher.match('\\path1\\path2\\path3\\zzz', {caseSensitive: true}))
+    ).toEqual([
+      '/path1/path2/path3/zzz',
+    ]);
+    expect(
+      values(matcher.match('\\path1\\path2\\path3\\zzz', {caseSensitive: false}))
+    ).toEqual([
+      '/path1/path2/path3/zzz',
+    ]);
+  });
+
+  it('returns exact matches than normalized path separator matches', () => {
+    matcher.setCandidates(
+      [0, 1, 2],
+      ['/path1/path2/path3/zzz', '/path1/path2/path3/zzz_ooo', '/path1/path2/path3/zzz/ooo']
+    );
+
+    expect(
+      values(matcher.match('path1/path2/path3/zzz', {caseSensitive: true}))
+    ).toEqual([
+      '/path1/path2/path3/zzz',
+      '/path1/path2/path3/zzz/ooo',
+      '/path1/path2/path3/zzz_ooo'
+    ]);
+    expect(
+      values(matcher.match('zzz_ooo', {caseSensitive: true}))
+    ).toEqual([
+      '/path1/path2/path3/zzz_ooo',
+      '/path1/path2/path3/zzz/ooo'
+    ]);
+    expect(
+      values(matcher.match('path1/path2/path3/zzz_ooo', {caseSensitive: true}))
+    ).toEqual([
+      '/path1/path2/path3/zzz_ooo',
+      '/path1/path2/path3/zzz/ooo'
+    ]);
+    expect(
+      values(matcher.match('path1/path2/path3/zzz_ooo', {caseSensitive: true}))
+    ).toEqual([
+      '/path1/path2/path3/zzz_ooo',
+      '/path1/path2/path3/zzz/ooo'
+    ]);
+    expect(
+      values(matcher.match('path1_path2_path3_zzz_ooo', {caseSensitive: true}))
+    ).toEqual([
+      '/path1/path2/path3/zzz_ooo',
+      '/path1/path2/path3/zzz/ooo'
+    ]);
+    expect(
+      values(matcher.match('path1/path2_path3/zzz_ooo', {caseSensitive: false}))
+    ).toEqual([
+      '/path1/path2/path3/zzz_ooo',
+      '/path1/path2/path3/zzz/ooo'
+    ]);
+    expect(
+      values(matcher.match('zzz/ooo', {caseSensitive: false}))
+    ).toEqual([
+      '/path1/path2/path3/zzz/ooo'
+    ]);
+  });
 });

@@ -30,8 +30,9 @@ T get_property(const v8::Local<v8::Object> &object, const char *name) {
  * This saves one string copy over using v8::String::Utf8Value.
  */
 std::string to_std_string(const v8::Local<v8::String> &v8str) {
-  std::string str(v8str->Utf8Length(), ' ');
-  v8str->WriteUtf8(&str[0]);
+  v8::Isolate *isolate = v8::Isolate::GetCurrent();
+  std::string str(v8str->Utf8Length(isolate), ' ');
+  v8str->WriteUtf8(isolate, &str[0]);
   return str;
 }
 
@@ -51,7 +52,8 @@ std::string get_string_property(const v8::Local<v8::Object> &object,
         std::string(" must be a string");
       ThrowTypeError(msg.c_str());
     }
-    return to_std_string(propLocal->ToString());
+
+    return to_std_string(Nan::To<v8::String>(propLocal).ToLocalChecked());
   }
   return std::string("");
 }
@@ -73,8 +75,10 @@ public:
     SetPrototypeMethod(tpl, "removeCandidates", RemoveCandidates);
     SetPrototypeMethod(tpl, "setCandidates", SetCandidates);
 
-    MatcherConstructor.Reset(tpl->GetFunction());
-    exports->Set(Nan::New("Matcher").ToLocalChecked(), tpl->GetFunction());
+    v8::Local<v8::Context> context = Nan::GetCurrentContext();
+
+    MatcherConstructor.Reset(tpl->GetFunction(context).ToLocalChecked());
+    Set(exports, Nan::New("Matcher").ToLocalChecked(), tpl->GetFunction(context).ToLocalChecked());
   }
 
   static void Create(const Nan::FunctionCallbackInfo<v8::Value> &info) {
@@ -92,12 +96,12 @@ public:
     }
 
     CHECK(info[0]->IsString(), "First argument should be a query string");
-    std::string query(to_std_string(info[0]->ToString()));
+    std::string query(to_std_string(Nan::To<v8::String>(info[0]).ToLocalChecked()));
 
     MatcherOptions options;
     if (info.Length() > 1) {
       CHECK(info[1]->IsObject(), "Second argument should be an options object");
-      auto options_obj = info[1]->ToObject();
+      auto options_obj = Nan::To<v8::Object>(info[1]).ToLocalChecked();
       options.case_sensitive = get_property<bool>(options_obj, "caseSensitive");
       options.smart_case = get_property<bool>(options_obj, "smartCase");
       options.num_threads = get_property<int>(options_obj, "numThreads");
@@ -159,7 +163,7 @@ public:
         auto id_value = ids->Get(i);
         CHECK(id_value->IsUint32(), "Expected first array to only contain unsigned 32-bit integer ids");
         auto id = v8::Local<v8::Uint32>::Cast(id_value)->Value();
-        auto value = to_std_string(values->Get(i)->ToString());
+        auto value = to_std_string(Nan::To<v8::String>(values->Get(i)).ToLocalChecked());
         matcher->impl_.addCandidate(id, value);
       }
     }

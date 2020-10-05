@@ -8,10 +8,14 @@ function values(results) {
   });
 }
 
+function genIds(values) {
+  return [Array.from({length: values.length}, (_, i) => i), values];
+}
+
 describe('fuzzy-native', function() {
   var matcher;
   beforeEach(function() {
-    matcher = new fuzzyNative.Matcher([
+    const paths = [
       '',
       'a',
       'ab',
@@ -27,7 +31,9 @@ describe('fuzzy-native', function() {
       '/path1/zzz/path3/path4',
       '/path1/path2/zzz/path4',
       '/path1/path2/path3/zzz',
-    ]);
+    ];
+
+    matcher = new fuzzyNative.Matcher(...genIds(paths));
   });
 
   it('can match strings', function() {
@@ -54,11 +60,11 @@ describe('fuzzy-native', function() {
     ]);
 
     // Defaults to case-insensitive matching (favouring the right case).
-    result = matcher.match('ABC');
+    result = matcher.match('ABC', {smartCase: true});
     expect(values(result)).toEqual([
+      'AlphaBetaCappa',
       'abC',
       'abcd',
-      'AlphaBetaCappa',
       'alphabetacappa',
     ]);
 
@@ -89,7 +95,7 @@ describe('fuzzy-native', function() {
   });
 
   it('uses smart case', function() {
-    var result = matcher.match('ThisIsATestDir');
+    var result = matcher.match('ThisIsATestDir', {smartCase: true});
     expect(values(result)).toEqual([
       '/////ThisIsATestDir',
       'thisisatestdir',
@@ -116,11 +122,11 @@ describe('fuzzy-native', function() {
   });
 
   it('prefers whole words', function() {
-    matcher.setCandidates([
+    matcher.setCandidates(...genIds([
       'testa',
       'testA',
       'tes/A',
-    ]);
+    ]));
     var result = matcher.match('a');
     expect(values(result)).toEqual([
       'tes/A',
@@ -129,10 +135,28 @@ describe('fuzzy-native', function() {
     ]);
   });
 
-  it('breaks ties by length', function() {
-    matcher.setCandidates(['123/a', '12/a', '1/a']);
+  it('breaks ties by length if root folder is not passed', function() {
+    matcher.setCandidates(...genIds(['123/a', '12/a', '1/a']));
     var result = matcher.match('a');
     expect(values(result)).toEqual(['1/a', '12/a', '123/a']);
+  });
+
+  it('breaks ties by distance to root folder', function() {
+    matcher.setCandidates(...genIds([
+      '/A/B/C/file.js',
+      '/A/B/file.js',
+      '/A/C/D/file.js',
+      '/A/REALLY_BIG_NAME/file.js',
+      '/A/file.js',
+    ]));
+    var result = matcher.match('file', {rootPath: '/A/B/C/'});
+    expect(values(result)).toEqual([
+      '/A/B/C/file.js',
+      '/A/B/file.js',
+      '/A/file.js',
+      '/A/REALLY_BIG_NAME/file.js',
+      '/A/C/D/file.js',
+    ]);
   });
 
   it('can limit to maxResults', function() {
@@ -141,10 +165,10 @@ describe('fuzzy-native', function() {
       'abC',
     ]);
 
-    result = matcher.match('ABC', {maxResults: 2});
+    result = matcher.match('ABC', {maxResults: 2, smartCase: true});
     expect(values(result)).toEqual([
+      'AlphaBetaCappa',
       'abC',
-      'abcd',
     ]);
   });
 
@@ -155,7 +179,7 @@ describe('fuzzy-native', function() {
     // alphabetacappa
     // _    _   _
     expect(result[2].matchIndexes).toEqual([0, 5, 9]);
-    expect(result[3].matchIndexes).toEqual([0, 5, 9]);
+    expect(result[3].matchIndexes).toEqual([4, 5, 9]);
 
     result = matcher.match('t/i/a/t/d', {recordMatchIndexes: true});
     // /this/is/a/test/dir',
@@ -169,31 +193,151 @@ describe('fuzzy-native', function() {
       'abC',
     ]);
 
-    matcher.setCandidates([]);
+    matcher.setCandidates([], []);
     result = matcher.match('abc');
     expect(values(result)).toEqual([]);
 
-    matcher.addCandidates(['abc', 'def']);
+    matcher.addCandidates([0, 1], ['abc', 'def']);
     result = matcher.match('abc');
     expect(values(result)).toEqual(['abc']);
 
-    matcher.removeCandidates(['abc']);
+    matcher.removeCandidates([0]);
     result = matcher.match('');
     expect(values(result)).toEqual(['def']);
+  });
+
+  it('applies a variable gap penalty', function() {
+    const CANDIDATE = 'abcdefghijk/test'
+    matcher.setCandidates([0], [CANDIDATE]);
+    // Gap penalty caps out at 0.2.
+    let query = 'a/test';
+    expect(matcher.match(query)[0].score)
+      .toBeCloseTo(0.20 * query.length / CANDIDATE.length);
+    query = 'ab/test';
+    expect(matcher.match(query)[0].score)
+      .toBeCloseTo(0.20 * query.length / CANDIDATE.length);
+    // And then decreases by 0.05.
+    query = 'abc/test';
+    expect(matcher.match(query)[0].score)
+      .toBeCloseTo(0.25 * query.length / CANDIDATE.length);
+    query = 'abcdefghij/test';
+    expect(matcher.match(query)[0].score)
+      .toBeCloseTo(0.6 * query.length / CANDIDATE.length);
+    query = 'abcdefghijk/test';
+    expect(matcher.match(query)[0].score)
+      .toBe(1);
   });
 
   it('supports large strings', function() {
     var longString = '';
     var indexes = [];
-    for (var i = 0; i < 1000; i++) {
-      longString += 'a';
-      indexes.push(i);
+    for (var i = 0; i < 500; i++) {
+      longString += 'ab';
+      indexes.push(i * 2, i * 2 + 1);
     }
-    matcher.addCandidates([longString]);
+    matcher.setCandidates([0], [longString]);
     expect(matcher.match(longString, {recordMatchIndexes: true})).toEqual([{
       score: 1,
+      id: 0,
       value: longString,
       matchIndexes: indexes,
     }]);
+
+    // Despite exceeding the scoring threshold, make sure penalties are applied.
+    const matches = matcher.match('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
+    expect(matches.length).toBe(1);
+    expect(matches[0].score).toBeLessThan(1e-6);
+  });
+
+  it('works with non-alpha characters', function() {
+    matcher.setCandidates([0, 1], ['-_01234', '01234-']);
+    expect(values(matcher.match('-034'))).toEqual(['-_01234']);
+  });
+
+  it('ensures that the ids array and the values array are the same length when adding candidates', () => {
+    const expectedMessage = 'Expected ids array and values array to have the same length';
+    expect(() => matcher.addCandidates([1, 2, 3], ["a", "b"])).toThrow(expectedMessage)
+    expect(() => matcher.addCandidates([1, 2], ["a", "b", "c"])).toThrow(expectedMessage)
+  });
+
+  it('returns match results for duplicate values with different ids', () => {
+    matcher.setCandidates([0, 1], ['abc', 'abc']);
+    expect(matcher.match('ac').length).toBe(2);
+    matcher.setCandidates([0, 0], ['abc', 'abc']);
+    expect(matcher.match('ac').length).toBe(1);
+  });
+
+  it('returns matches when using different path separators', () => {
+    expect(
+      values(matcher.match('path1_path2_path3_zzz', {caseSensitive: true}))
+    ).toEqual([
+      '/path1/path2/path3/zzz',
+    ]);
+    expect(
+      values(matcher.match('path1_path2_path3_zzz', {caseSensitive: false}))
+    ).toEqual([
+      '/path1/path2/path3/zzz',
+    ]);
+
+    expect(
+      values(matcher.match('\\path1\\path2\\path3\\zzz', {caseSensitive: true}))
+    ).toEqual([
+      '/path1/path2/path3/zzz',
+    ]);
+    expect(
+      values(matcher.match('\\path1\\path2\\path3\\zzz', {caseSensitive: false}))
+    ).toEqual([
+      '/path1/path2/path3/zzz',
+    ]);
+  });
+
+  it('returns exact matches than normalized path separator matches', () => {
+    matcher.setCandidates(
+      [0, 1, 2],
+      ['/path1/path2/path3/zzz', '/path1/path2/path3/zzz_ooo', '/path1/path2/path3/zzz/ooo']
+    );
+
+    expect(
+      values(matcher.match('path1/path2/path3/zzz', {caseSensitive: true}))
+    ).toEqual([
+      '/path1/path2/path3/zzz',
+      '/path1/path2/path3/zzz/ooo',
+      '/path1/path2/path3/zzz_ooo'
+    ]);
+    expect(
+      values(matcher.match('zzz_ooo', {caseSensitive: true}))
+    ).toEqual([
+      '/path1/path2/path3/zzz_ooo',
+      '/path1/path2/path3/zzz/ooo'
+    ]);
+    expect(
+      values(matcher.match('path1/path2/path3/zzz_ooo', {caseSensitive: true}))
+    ).toEqual([
+      '/path1/path2/path3/zzz_ooo',
+      '/path1/path2/path3/zzz/ooo'
+    ]);
+    expect(
+      values(matcher.match('path1/path2/path3/zzz_ooo', {caseSensitive: true}))
+    ).toEqual([
+      '/path1/path2/path3/zzz_ooo',
+      '/path1/path2/path3/zzz/ooo'
+    ]);
+    expect(
+      values(matcher.match('path1_path2_path3_zzz_ooo', {caseSensitive: true}))
+    ).toEqual([
+      '/path1/path2/path3/zzz_ooo',
+      '/path1/path2/path3/zzz/ooo'
+    ]);
+    expect(
+      values(matcher.match('path1/path2_path3/zzz_ooo', {caseSensitive: false}))
+    ).toEqual([
+      '/path1/path2/path3/zzz_ooo',
+      '/path1/path2/path3/zzz/ooo'
+    ]);
+    expect(
+      values(matcher.match('zzz/ooo', {caseSensitive: false}))
+    ).toEqual([
+      '/path1/path2/path3/zzz/ooo'
+    ]);
   });
 });

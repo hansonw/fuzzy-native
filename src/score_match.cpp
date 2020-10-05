@@ -6,8 +6,14 @@
  * with a few modifications and extra optimizations.
  */
 
+#include <algorithm>
 #include <string>
 #include <cstring>
+
+// memrchr is a non-standard extension only available in glibc.
+#if defined(__APPLE__) || defined(_WIN32) || defined(_WIN64)
+#include "memrchr.h"
+#endif
 
 using namespace std;
 
@@ -18,7 +24,7 @@ const float BASE_DISTANCE_PENALTY = 0.6;
 const float ADDITIONAL_DISTANCE_PENALTY = 0.05;
 
 // The lowest the distance penalty can go. Add epsilon for precision errors.
-const float MIN_DISTANCE_PENALTY = 0.2 + 1e-9;
+const float MIN_DISTANCE_PENALTY = 0.2;
 
 // Bail if the state space exceeds this limit.
 const size_t MAX_MEMO_SIZE = 10000;
@@ -36,6 +42,7 @@ struct MatchInfo {
   size_t *best_match;
   bool smart_case;
   size_t max_gap;
+  float min_score;
 };
 
 /**
@@ -61,13 +68,14 @@ struct MatchInfo {
  */
 float recursive_match(const MatchInfo &m,
                       const size_t haystack_idx,
-                      const size_t needle_idx) {
+                      const size_t needle_idx,
+                      const float cur_score) {
   if (needle_idx == m.needle_len) {
     return 1;
   }
 
   float &memoized = m.memo[needle_idx * m.haystack_len + haystack_idx];
-  if (memoized != -1) {
+  if (memoized >= 0) {
     return memoized;
   }
 
@@ -83,13 +91,14 @@ float recursive_match(const MatchInfo &m,
   // This is only used when needle_idx == haystack_idx == 0.
   // It won't be accurate for any other run.
   size_t last_slash = 0;
-  float dist_penalty = BASE_DISTANCE_PENALTY;
   for (size_t j = haystack_idx; j <= lim; j++) {
     char d = m.haystack_case[j];
-    if (needle_idx == 0 && (d == '/' || d == '\\')) {
+    bool is_path_sep = d == '/' || d == '\\';
+
+    if (needle_idx == 0 && is_path_sep) {
       last_slash = j;
     }
-    if (c == d) {
+    if (c == d || (is_path_sep && (c == '_' || c == '\\'))) {
       // calculate score
       float char_score = 1.0;
       if (j > haystack_idx) {
@@ -104,25 +113,48 @@ float recursive_match(const MatchInfo &m,
           char_score = 0.8;
         } else if (last == '.') {
           char_score = 0.7;
+        } else if (needle_idx == 0) {
+          char_score = BASE_DISTANCE_PENALTY;
         } else {
-          char_score = dist_penalty;
-        }
-        // For the first character, disregard the actual distance.
-        if (needle_idx && dist_penalty > MIN_DISTANCE_PENALTY) {
-          dist_penalty -= ADDITIONAL_DISTANCE_PENALTY;
+          char_score = max(
+            MIN_DISTANCE_PENALTY,
+            BASE_DISTANCE_PENALTY -
+              (j - haystack_idx - 1) * ADDITIONAL_DISTANCE_PENALTY
+          );
         }
       }
 
-      if (m.smart_case && m.needle[needle_idx] != m.haystack[j]) {
-        char_score *= 0.9;
+      // Apply a severe penalty if the case doesn't match.
+      // This will make the exact matches have higher score than the case
+      // insensitive and the path insensitive matches.
+      if (
+        (m.smart_case || m.haystack[j] == '/') &&
+        m.needle[needle_idx] != m.haystack[j]
+      ) {
+        char_score *= 0.001;
       }
 
-      float new_score = char_score * recursive_match(m, j + 1, needle_idx + 1);
+      float multiplier = char_score;
       // Scale the score based on how much of the path was actually used.
       // (We measure this via # of characters since the last slash.)
       if (needle_idx == 0) {
-        new_score /= float(m.haystack_len - last_slash);
+        multiplier /= float(m.haystack_len - last_slash);
       }
+      float next_score = 1.0;
+      if (m.min_score > 0) {
+        next_score = cur_score * multiplier;
+        // Scores only decrease. If we can't pass the previous best, bail
+        if (next_score < m.min_score) {
+          // Ensure that score is non-zero:
+          // MatcherBase shouldn't exclude this from future searches.
+          if (score == 0) {
+            score = 1e-18;
+          }
+          continue;
+        }
+      }
+      float new_score =
+        multiplier * recursive_match(m, j + 1, needle_idx + 1, next_score);
       if (new_score > score) {
         score = new_score;
         best_match = j;
@@ -145,6 +177,7 @@ float score_match(const char *haystack,
                   const char *needle,
                   const char *needle_lower,
                   const MatchOptions &options,
+                  const float min_score,
                   vector<int> *match_indexes) {
   if (!*needle) {
     return 1.0;
@@ -157,9 +190,10 @@ float score_match(const char *haystack,
   m.needle_case = options.case_sensitive ? needle : needle_lower;
   m.smart_case = options.smart_case;
   m.max_gap = options.max_gap;
+  m.min_score = min_score;
 
 #ifdef _WIN32
-  int *last_match = (int*)_malloca(m.needle_len * sizeof(int));
+  int *last_match = (int*)_alloca(m.needle_len * sizeof(int));
 #else
   int last_match[m.needle_len];
 #endif
@@ -168,15 +202,22 @@ float score_match(const char *haystack,
   // Check if the needle exists in the haystack at all.
   // Simultaneously, we can figure out the last possible match for each needle
   // character (which prunes the search space by a ton)
-  int hindex = m.haystack_len - 1;
+  int hindex = m.haystack_len;
   for (int i = m.needle_len - 1; i >= 0; i--) {
-    while (hindex >= 0 && m.haystack_case[hindex] != m.needle_case[i]) {
-      hindex--;
+    char* ptr = (char*)memrchr(m.haystack_case, m.needle_case[i], hindex);
+    if (ptr == nullptr) {
+      // Since we treat _ and \\ as path separators, we need to re-check if path
+      // separator exists on the string in case they exact chars are not found.
+      if (m.needle_case[i] == '_' || m.needle_case[i] == '\\') {
+        ptr = (char*)memrchr(m.haystack_case, '/', hindex);
+      }
+
+      if (ptr == nullptr) {
+        return 0;
+      }
     }
-    if (hindex < 0) {
-      return 0;
-    }
-    last_match[i] = hindex--;
+    hindex = ptr - m.haystack_case;
+    last_match[i] = hindex;
   }
 
   m.haystack = haystack;
@@ -186,14 +227,17 @@ float score_match(const char *haystack,
   if (memo_size >= MAX_MEMO_SIZE) {
     // Just return the initial match.
     float penalty = 1.0;
-    if (match_indexes != nullptr) {
-      match_indexes->resize(m.needle_len);
-      for (size_t i = 0; i < m.needle_len; i++) {
-        match_indexes->at(i) = last_match[i];
-        if (i && last_match[i] != last_match[i - 1] + 1) {
-          penalty *= BASE_DISTANCE_PENALTY;
-        }
+    for (size_t i = 1; i < m.needle_len; i++) {
+      int gap = last_match[i] - last_match[i - 1];
+      if (gap > 1) {
+        penalty *= max(
+          MIN_DISTANCE_PENALTY,
+          BASE_DISTANCE_PENALTY - (gap - 1) * ADDITIONAL_DISTANCE_PENALTY
+        );
       }
+    }
+    if (match_indexes != nullptr) {
+      *match_indexes = vector<int>(last_match, last_match + m.needle_len);
     }
     return penalty * m.needle_len / m.haystack_len;
   }
@@ -205,16 +249,17 @@ float score_match(const char *haystack,
   }
 
 #ifdef _WIN32
-  float *memo = (float*)_malloca(memo_size * sizeof(float));
+  float *memo = (float*)_alloca(memo_size * sizeof(float));
 #else
   float memo[memo_size];
 #endif
-  fill(memo, memo + memo_size, -1);
+  // This doesn't set the values to -2, but some negative number.
+  memset(memo, -2, sizeof(float) * memo_size);
   m.memo = memo;
 
   // Since we scaled by the length of haystack used,
   // scale it back up by the needle length.
-  float score = m.needle_len * recursive_match(m, 0, 0);
+  float score = m.needle_len * recursive_match(m, 0, 0, m.needle_len);
   if (score <= 0) {
     return 0.0;
   }

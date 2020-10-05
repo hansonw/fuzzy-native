@@ -2,6 +2,7 @@
 #include "score_match.h"
 
 #include <algorithm>
+#include <atomic>
 #include <queue>
 #include <thread>
 
@@ -9,11 +10,22 @@ using namespace std;
 
 typedef priority_queue<MatchResult> ResultHeap;
 
-inline int letter_bitmask(const char *str) {
-  int result = 0;
-  for (int i = 0; str[i]; i++) {
-    if (str[i] >= 'a' && str[i] <= 'z') {
-      result |= (1 << (str[i] - 'a'));
+inline uint64_t letter_bitmask(const std::string &str) {
+  uint64_t result = 0;
+  for (char c : str) {
+    if (c >= 'a' && c <= 'z') {
+      int index = c - 'a';
+      uint64_t count_bit = (result >> (index * 2));
+      // "Increment" the count_bit:
+      // 00 -> 01
+      // 01 -> 11
+      // 11 -> 11
+      count_bit = ((count_bit << 1) | 1) & 3;
+      result |= count_bit << (index * 2);
+    } else if (c == '-') {
+      result |= (1UL << 52);
+    } else if (c >= '0' && c <= '9') {
+      result |= (1UL << (c - '0' + 54));
     }
   }
   return result;
@@ -29,13 +41,59 @@ inline string str_to_lower(const std::string &s) {
   return lower;
 }
 
+bool is_slash(char c) {
+  return c == '/' || c == '\\';
+}
+
+int num_dirs(const std::string &path) {
+  int num = 0;
+  for (size_t i = 0; i < path.length(); i++) {
+    if (is_slash(path[i])) {
+      num++;
+    }
+  }
+  return num;
+}
+
+int score_based_root_path(const MatchOptions &options,
+                          const MatcherBase::CandidateData &candidate) {
+  const std::string &root = options.root_path;
+  if (root.length() == 0) {
+    return 0;
+  }
+
+  const std::string &value = candidate.value;
+
+  size_t num_common_dirs = 0;
+  size_t i = 0;
+
+  // Count number of common directories
+  for (; i < root.length() && i < value.length(); i++) {
+    if (root[i] != value[i]) {
+      break;
+    }
+    if (is_slash(root[i])) {
+      num_common_dirs++;
+    }
+  }
+
+  if (i == root.length() && i < value.length() && is_slash(value[i])) {
+    num_common_dirs++;
+  }
+
+  return 1000 * num_common_dirs - candidate.num_dirs;
+}
+
 // Push a new entry on the heap while ensuring size <= max_results.
 void push_heap(ResultHeap &heap,
                float score,
+               int score_based_root_path,
+               uint32_t id,
                const std::string *value,
                size_t max_results) {
-  if (heap.size() < max_results || score > heap.top().score) {
-    heap.emplace(score, value);
+  MatchResult result(score, score_based_root_path, id, value);
+  if (heap.size() < max_results || result < heap.top()) {
+    heap.push(std::move(result));
     if (heap.size() > max_results) {
       heap.pop();
     }
@@ -59,6 +117,7 @@ vector<MatchResult> finalize(const string &query,
         query.c_str(),
         query_case.c_str(),
         options,
+        0.0,
         result.matchIndexes.get()
       );
     }
@@ -73,25 +132,52 @@ void thread_worker(
   const string &query,
   const string &query_case,
   const MatchOptions &options,
+  bool use_last_match,
+  std::atomic<float>* min_score,
   size_t max_results,
-  const vector<MatcherBase::CandidateData> &candidates,
+  vector<MatcherBase::CandidateData> &candidates,
   size_t start,
   size_t end,
   ResultHeap &result
 ) {
-  int bitmask = letter_bitmask(query_case.c_str());
+  uint64_t bitmask = letter_bitmask(query_case.c_str());
   for (size_t i = start; i < end; i++) {
-    const auto &candidate = candidates[i];
+    auto &candidate = candidates[i];
+    if (use_last_match && !candidate.last_match) {
+      continue;
+    }
     if ((bitmask & candidate.bitmask) == bitmask) {
       float score = score_match(
         candidate.value.c_str(),
         candidate.lowercase.c_str(),
         query.c_str(),
         query_case.c_str(),
-        options
+        options,
+        min_score->load()
       );
       if (score > 0) {
-        push_heap(result, score, &candidate.value, max_results);
+        push_heap(
+          result,
+          score,
+          score_based_root_path(options, candidate),
+          candidate.id,
+          &candidate.value,
+          max_results
+        );
+        if (result.size() == max_results) {
+          float current_max = result.top().score;
+          float min_score_value = min_score->load();
+          // Unfortunately there's no thread-safe "max"...
+          // When running compare_exchange_weak it's possible that another
+          // thread wrote to it in the meantime, in which case we have to check
+          // again. Since it's always increasing this is guaranteed to converge.
+          while (current_max > min_score_value) {
+            min_score->compare_exchange_weak(min_score_value, current_max);
+          }
+        }
+        candidate.last_match = true;
+      } else {
+        candidate.last_match = false;
       }
     }
   }
@@ -108,6 +194,7 @@ vector<MatchResult> MatcherBase::findMatches(const std::string &query,
   matchOptions.case_sensitive = options.case_sensitive;
   matchOptions.smart_case = false;
   matchOptions.max_gap = options.max_gap;
+  matchOptions.root_path = options.root_path;
 
   string new_query;
   // Ignore all whitespace in the query.
@@ -115,7 +202,7 @@ vector<MatchResult> MatcherBase::findMatches(const std::string &query,
     if (!isspace(c)) {
       new_query += c;
     }
-    if (isupper(c) && !matchOptions.case_sensitive) {
+    if (options.smart_case && isupper(c) && !matchOptions.case_sensitive) {
       matchOptions.smart_case = true;
     }
   }
@@ -127,10 +214,16 @@ vector<MatchResult> MatcherBase::findMatches(const std::string &query,
     query_case = query;
   }
 
+  // If our current query is just an extension of the last query,
+  // quickly ignore all previous non-matches as an optimization.
+  bool use_last_match = query_case.substr(0, lastQuery_.size()) == lastQuery_;
+  lastQuery_ = query_case;
+
   ResultHeap combined;
+  std::atomic<float> min_score(0);
   if (num_threads == 0 || candidates_.size() < 10000) {
-    thread_worker(new_query, query_case, matchOptions, max_results,
-                  candidates_, 0, candidates_.size(), combined);
+    thread_worker(new_query, query_case, matchOptions, use_last_match, &min_score,
+                  max_results, candidates_, 0, candidates_.size(), combined);
   } else {
     vector<ResultHeap> thread_results(num_threads);
     vector<thread> threads;
@@ -146,6 +239,8 @@ vector<MatchResult> MatcherBase::findMatches(const std::string &query,
         ref(new_query),
         ref(query_case),
         ref(matchOptions),
+        use_last_match,
+        &min_score,
         max_results,
         ref(candidates_),
         cur_start,
@@ -159,7 +254,14 @@ vector<MatchResult> MatcherBase::findMatches(const std::string &query,
       threads[i].join();
       while (thread_results[i].size()) {
         auto &top = thread_results[i].top();
-        push_heap(combined, top.score, top.value, max_results);
+        push_heap(
+          combined,
+          top.score,
+          top.score_based_root_path,
+          top.id,
+          top.value,
+          max_results
+        );
         thread_results[i].pop();
       }
     }
@@ -174,28 +276,31 @@ vector<MatchResult> MatcherBase::findMatches(const std::string &query,
   );
 }
 
-void MatcherBase::addCandidate(const string &candidate) {
-  auto it = lookup_.find(candidate);
+void MatcherBase::addCandidate(uint32_t id, const string &candidate) {
+  auto it = lookup_.find(id);
   if (it == lookup_.end()) {
     string lowercase = str_to_lower(candidate);
-    lookup_[candidate] = candidates_.size();
+    lookup_[id] = candidates_.size();
     CandidateData data;
+    data.id = id;
     data.value = candidate;
     data.bitmask = letter_bitmask(lowercase.c_str());
     data.lowercase = move(lowercase);
+    data.last_match = true;
+    data.num_dirs = num_dirs(candidate);
     candidates_.emplace_back(move(data));
   }
 }
 
-void MatcherBase::removeCandidate(const string &candidate) {
-  auto it = lookup_.find(candidate);
+void MatcherBase::removeCandidate(uint32_t id) {
+  auto it = lookup_.find(id);
   if (it != lookup_.end()) {
     if (it->second + 1 != candidates_.size()) {
       swap(candidates_[it->second], candidates_.back());
-      lookup_[candidates_[it->second].value] = it->second;
+      lookup_[candidates_[it->second].id] = it->second;
     }
     candidates_.pop_back();
-    lookup_.erase(candidate);
+    lookup_.erase(id);
   }
 }
 

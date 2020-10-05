@@ -31,6 +31,7 @@ export type MatcherOptions = {
 }
 
 export type MatchResult = {
+  id: number,
   value: string,
 
   // A number in the range (0-1]. Higher scores are more relevant.
@@ -49,9 +50,9 @@ export class Matcher {
   // Will be ordered by score, descending.
   match: (query: string, options?: MatcherOptions) => Array<MatchResult>;
 
-  addCandidates: (candidates: Array<string>) => void;
-  removeCandidates: (candidates: Array<string>) => void;
-  setCandidates: (candidates: Array<string>) => void;
+  addCandidates: (ids: Array<number>, candidates: Array<string>) => void;
+  removeCandidates: (ids: Array<number>) => void;
+  setCandidates: (ids: Array<number>, candidates: Array<string>) => void;
 }
 ```
 
@@ -69,3 +70,63 @@ There are a few notable additional optimizations:
 
 - Before running the recursive matcher, we first do a backwards scan through the haystack to see if the needle exists at all. At the same time, we compute the right-most match for each character in the needle to prune the search space.
 - For each candidate string, we pre-compute and store a bitmask of its letters in `MatcherBase`. We then compare this the "letter bitmask" of the query to quickly prune out non-matches.
+
+## How to keep this fork updated
+
+This project is a fork of https://github.com/facebook-atom/nuclide-prebuilt-libs/tree/master/fuzzy-native. Since the upstream project is located in a subfolder of another git repository, some extra steps need to be done in order to rebase new commits to this fork.
+
+This section describes the steps to follow each time we want to do that.
+
+First, add a git remote that points to the upstream repository on your local copy of the fork:
+
+```sh
+$ git remote add nuclide-prebuilt-libs git@github.com:facebook-atom/nuclide-prebuilt-libs.git
+# Fetch the commits but ignore the tags.
+$ git fetch --no-tags nuclide-prebuilt-libs
+```
+
+Then, checkout the master branch of the upstream repository and execute a subtreee split, which is going to create a new branch called `upstream` with the contents and history of the `fuzzy-finder/` folder on the upstream repo:
+
+```sh
+$ git checkout nuclide-prebuilt-libs/master
+# This is where the magic happens.
+$ git subtree split --prefix=fuzzy-native -b upstream
+# Delete the remote since we don't need it anymore.
+git remote remove nuclide-prebuilt-libs
+```
+
+Next, we are going to create a `sync-upstream` branch which is going to contain the new commits from the upstream repo that we want to merge on our fork:
+
+```sh
+# Create the branch pointing to the upstream branch.
+$ git checkout -b sync-upstream upstream
+# Rebase all the new commits (descendants of the commit stored in .last-synced-commit) onto the master branch (this may lead to some conflicts).
+$ git rebase --onto master $(cat .last-synced-commit) sync-upstream
+```
+
+Now we have on the `sync-upstream` branch all the new commits from the upstream repo since the last time we synced. We may want to discard some of these commits (for example the ones that modify files that handle building multiple projects, since they only make sense on the upstream repo):
+
+```sh
+# Delete the commits that make no sense using an interactive rebase.
+git rebase -i master
+```
+
+Then we store on the `.last-synced-commit` file the last commit id that was synced. This is going to be used the next time we sync commits from the upstream repo:
+
+```sh
+$ git rev-parse upstream > .last-synced-commit
+$ git add .last-synced-commit
+$ git commit -m "Update reference to the last synced commit"
+```
+
+Finanlly, push the `sync-upstream` branch to our fork and send a PR!
+
+```sh
+git push origin sync-upstream
+```
+
+Clean up the local branches, since they are not needed anymore (they'll be recreated next time you want to sync):
+
+```sh
+$ git branch -D upstream sync-upstream
+```
